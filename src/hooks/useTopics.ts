@@ -32,7 +32,7 @@ export const useTopics = () => {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setTopics(data || []);
+      setTopics((data || []) as Topic[]);
     } catch (error: any) {
       toast({
         title: "Error fetching topics",
@@ -59,7 +59,7 @@ export const useTopics = () => {
 
       if (error) throw error;
       
-      setTopics(prev => [data, ...prev]);
+      setTopics(prev => [data as Topic, ...prev]);
       toast({
         title: "Topic added",
         description: "Your topic has been added successfully."
@@ -87,7 +87,7 @@ export const useTopics = () => {
 
       if (error) throw error;
       
-      setTopics(prev => prev.map(topic => topic.id === id ? data : topic));
+      setTopics(prev => prev.map(topic => topic.id === id ? data as Topic : topic));
       return { data, error: null };
     } catch (error: any) {
       toast({

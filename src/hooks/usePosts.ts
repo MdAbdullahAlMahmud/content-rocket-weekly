@@ -47,7 +47,7 @@ export const usePosts = () => {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setPosts(data || []);
+      setPosts((data || []) as Post[]);
     } catch (error: any) {
       toast({
         title: "Error fetching posts",
