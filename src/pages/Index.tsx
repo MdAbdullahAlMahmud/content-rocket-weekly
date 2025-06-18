@@ -1,151 +1,232 @@
 
-import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, Brain, BarChart3, Zap, ChevronRight, Check } from "lucide-react";
-import Dashboard from "@/components/Dashboard";
+import { 
+  Brain, 
+  Calendar, 
+  Zap, 
+  Users, 
+  ArrowRight, 
+  CheckCircle,
+  Sparkles,
+  Target,
+  Clock
+} from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/hooks/useAuth";
 
 const Index = () => {
-  const [showDashboard, setShowDashboard] = useState(false);
+  const navigate = useNavigate();
+  const { user } = useAuth();
 
-  if (showDashboard) {
-    return <Dashboard onBack={() => setShowDashboard(false)} />;
-  }
+  const handleGetStarted = () => {
+    if (user) {
+      navigate('/dashboard');
+    } else {
+      navigate('/auth');
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
+      {/* Header */}
+      <div className="bg-white/80 backdrop-blur-sm border-b border-white/20">
+        <div className="container mx-auto px-4 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Brain className="h-8 w-8 text-blue-600" />
+              <h1 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                LinkedIn AI Scheduler
+              </h1>
+            </div>
+            <div className="flex items-center gap-4">
+              {user ? (
+                <Button onClick={() => navigate('/dashboard')} className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
+                  Go to Dashboard
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
+              ) : (
+                <>
+                  <Button variant="ghost" onClick={() => navigate('/auth')}>
+                    Sign In
+                  </Button>
+                  <Button onClick={() => navigate('/auth')} className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
+                    Get Started
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </Button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Hero Section */}
-      <div className="container mx-auto px-4 py-12">
-        <div className="text-center max-w-4xl mx-auto mb-16">
-          <Badge className="mb-6 bg-blue-100 text-blue-800 hover:bg-blue-200">
-            🚀 AI-Powered Content Automation
+      <div className="container mx-auto px-4 py-16">
+        <div className="text-center mb-16">
+          <Badge className="mb-4 bg-blue-100 text-blue-800 border-blue-200">
+            <Sparkles className="w-3 h-3 mr-1" />
+            AI-Powered Content Creation
           </Badge>
-          <h1 className="text-5xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-blue-800 bg-clip-text text-transparent mb-6">
-            LinkedIn AI Scheduler
+          <h1 className="text-5xl font-bold text-slate-900 mb-6 leading-tight">
+            Automate Your
+            <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+              {" "}LinkedIn Content
+            </span>
+            <br />
+            Strategy with AI
           </h1>
-          <p className="text-xl text-slate-600 mb-8 leading-relaxed">
-            Automate your LinkedIn presence with AI-generated content. Set your tone once, 
-            then watch as quality posts are created and scheduled 3x per week.
+          <p className="text-xl text-slate-600 mb-8 max-w-3xl mx-auto">
+            Transform your professional presence with intelligent content generation, 
+            automated scheduling, and data-driven insights. Never run out of engaging 
+            LinkedIn posts again.
           </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+          <div className="flex items-center justify-center gap-4">
             <Button 
               size="lg" 
-              className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg"
-              onClick={() => setShowDashboard(true)}
+              onClick={handleGetStarted}
+              className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-lg px-8 py-3"
             >
-              Open Dashboard
-              <ChevronRight className="ml-2 h-4 w-4" />
+              Start Creating Content
+              <ArrowRight className="ml-2 h-5 w-5" />
             </Button>
-            <Button size="lg" variant="outline" className="border-slate-300 hover:bg-slate-50">
+            <Button size="lg" variant="outline" className="text-lg px-8 py-3">
               Watch Demo
             </Button>
           </div>
         </div>
 
         {/* Features Grid */}
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-16">
-          <Card className="border-0 shadow-lg bg-white/80 backdrop-blur-sm hover:shadow-xl transition-all duration-300">
-            <CardHeader className="text-center pb-4">
-              <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl flex items-center justify-center mx-auto mb-4">
+        <div className="grid lg:grid-cols-3 gap-8 mb-16">
+          <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl hover:shadow-2xl transition-all duration-300">
+            <CardHeader>
+              <div className="w-12 h-12 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg flex items-center justify-center mb-4">
                 <Brain className="h-6 w-6 text-white" />
               </div>
-              <CardTitle className="text-lg">AI Content Generation</CardTitle>
+              <CardTitle className="text-xl">AI Content Generation</CardTitle>
+              <CardDescription>
+                Create engaging LinkedIn posts instantly with our advanced AI that understands your industry and audience.
+              </CardDescription>
             </CardHeader>
-            <CardContent className="text-center">
-              <p className="text-slate-600">Smart AI creates engaging LinkedIn posts from your topic bank with your unique voice.</p>
+            <CardContent>
+              <ul className="space-y-2">
+                <li className="flex items-center text-sm text-slate-600">
+                  <CheckCircle className="h-4 w-4 text-green-500 mr-2" />
+                  Industry-specific content
+                </li>
+                <li className="flex items-center text-sm text-slate-600">
+                  <CheckCircle className="h-4 w-4 text-green-500 mr-2" />
+                  Multiple content formats
+                </li>
+                <li className="flex items-center text-sm text-slate-600">
+                  <CheckCircle className="h-4 w-4 text-green-500 mr-2" />
+                  Brand voice consistency
+                </li>
+              </ul>
             </CardContent>
           </Card>
 
-          <Card className="border-0 shadow-lg bg-white/80 backdrop-blur-sm hover:shadow-xl transition-all duration-300">
-            <CardHeader className="text-center pb-4">
-              <div className="w-12 h-12 bg-gradient-to-r from-green-500 to-emerald-500 rounded-xl flex items-center justify-center mx-auto mb-4">
+          <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl hover:shadow-2xl transition-all duration-300">
+            <CardHeader>
+              <div className="w-12 h-12 bg-gradient-to-r from-purple-600 to-pink-600 rounded-lg flex items-center justify-center mb-4">
                 <Calendar className="h-6 w-6 text-white" />
               </div>
-              <CardTitle className="text-lg">Auto Scheduling</CardTitle>
+              <CardTitle className="text-xl">Smart Scheduling</CardTitle>
+              <CardDescription>
+                Optimize your posting schedule with AI-driven timing recommendations for maximum engagement.
+              </CardDescription>
             </CardHeader>
-            <CardContent className="text-center">
-              <p className="text-slate-600">Posts automatically scheduled for Monday, Wednesday, Friday at optimal times.</p>
+            <CardContent>
+              <ul className="space-y-2">
+                <li className="flex items-center text-sm text-slate-600">
+                  <CheckCircle className="h-4 w-4 text-green-500 mr-2" />
+                  Optimal posting times
+                </li>
+                <li className="flex items-center text-sm text-slate-600">
+                  <CheckCircle className="h-4 w-4 text-green-500 mr-2" />
+                  Automated publishing
+                </li>
+                <li className="flex items-center text-sm text-slate-600">
+                  <CheckCircle className="h-4 w-4 text-green-500 mr-2" />
+                  Content calendar view
+                </li>
+              </ul>
             </CardContent>
           </Card>
 
-          <Card className="border-0 shadow-lg bg-white/80 backdrop-blur-sm hover:shadow-xl transition-all duration-300">
-            <CardHeader className="text-center pb-4">
-              <div className="w-12 h-12 bg-gradient-to-r from-orange-500 to-red-500 rounded-xl flex items-center justify-center mx-auto mb-4">
-                <BarChart3 className="h-6 w-6 text-white" />
+          <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl hover:shadow-2xl transition-all duration-300">
+            <CardHeader>
+              <div className="w-12 h-12 bg-gradient-to-r from-green-600 to-blue-600 rounded-lg flex items-center justify-center mb-4">
+                <Target className="h-6 w-6 text-white" />
               </div>
-              <CardTitle className="text-lg">Analytics Dashboard</CardTitle>
+              <CardTitle className="text-xl">Topic Management</CardTitle>
+              <CardDescription>
+                Organize your content strategy with intelligent topic banks and trend-based suggestions.
+              </CardDescription>
             </CardHeader>
-            <CardContent className="text-center">
-              <p className="text-slate-600">Track performance, manage content, and optimize your LinkedIn strategy.</p>
-            </CardContent>
-          </Card>
-
-          <Card className="border-0 shadow-lg bg-white/80 backdrop-blur-sm hover:shadow-xl transition-all duration-300">
-            <CardHeader className="text-center pb-4">
-              <div className="w-12 h-12 bg-gradient-to-r from-violet-500 to-purple-500 rounded-xl flex items-center justify-center mx-auto mb-4">
-                <Zap className="h-6 w-6 text-white" />
-              </div>
-              <CardTitle className="text-lg">Full Control</CardTitle>
-            </CardHeader>
-            <CardContent className="text-center">
-              <p className="text-slate-600">Review, edit, or regenerate any content before it goes live. You're always in control.</p>
+            <CardContent>
+              <ul className="space-y-2">
+                <li className="flex items-center text-sm text-slate-600">
+                  <CheckCircle className="h-4 w-4 text-green-500 mr-2" />
+                  Topic categorization
+                </li>
+                <li className="flex items-center text-sm text-slate-600">
+                  <CheckCircle className="h-4 w-4 text-green-500 mr-2" />
+                  Trend analysis
+                </li>
+                <li className="flex items-center text-sm text-slate-600">
+                  <CheckCircle className="h-4 w-4 text-green-500 mr-2" />
+                  Content planning
+                </li>
+              </ul>
             </CardContent>
           </Card>
         </div>
 
-        {/* Process Section */}
-        <div className="bg-white/60 backdrop-blur-sm rounded-3xl p-8 mb-16 border border-white/20">
-          <h2 className="text-3xl font-bold text-center mb-12 bg-gradient-to-r from-slate-700 to-slate-900 bg-clip-text text-transparent">
-            How It Works
-          </h2>
-          <div className="grid md:grid-cols-3 gap-8">
-            <div className="text-center">
-              <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center mx-auto mb-4">
-                <span className="text-white font-bold text-xl">1</span>
-              </div>
-              <h3 className="font-semibold text-lg mb-2">Set Your Topics</h3>
-              <p className="text-slate-600">Add topics to your knowledge bank that reflect your expertise and interests.</p>
+        {/* Stats Section */}
+        <div className="bg-white/60 backdrop-blur-sm rounded-2xl p-8 mb-16">
+          <div className="grid md:grid-cols-4 gap-8 text-center">
+            <div>
+              <div className="text-3xl font-bold text-slate-900 mb-2">10x</div>
+              <div className="text-slate-600">Faster Content Creation</div>
             </div>
-            <div className="text-center">
-              <div className="w-16 h-16 bg-gradient-to-r from-green-500 to-emerald-500 rounded-full flex items-center justify-center mx-auto mb-4">
-                <span className="text-white font-bold text-xl">2</span>
-              </div>
-              <h3 className="font-semibold text-lg mb-2">AI Creates Content</h3>
-              <p className="text-slate-600">Every Sunday, AI generates 3 engaging posts for the week ahead.</p>
+            <div>
+              <div className="text-3xl font-bold text-slate-900 mb-2">85%</div>
+              <div className="text-slate-600">Time Saved Weekly</div>
             </div>
-            <div className="text-center">
-              <div className="w-16 h-16 bg-gradient-to-r from-orange-500 to-red-500 rounded-full flex items-center justify-center mx-auto mb-4">
-                <span className="text-white font-bold text-xl">3</span>
-              </div>
-              <h3 className="font-semibold text-lg mb-2">Auto Published</h3>
-              <p className="text-slate-600">Posts are automatically scheduled and published at optimal times.</p>
+            <div>
+              <div className="text-3xl font-bold text-slate-900 mb-2">3x</div>
+              <div className="text-slate-600">Higher Engagement</div>
+            </div>
+            <div>
+              <div className="text-3xl font-bold text-slate-900 mb-2">24/7</div>
+              <div className="text-slate-600">Automated Posting</div>
             </div>
           </div>
         </div>
 
-        {/* Benefits */}
+        {/* CTA Section */}
         <div className="text-center">
-          <h2 className="text-3xl font-bold mb-8 bg-gradient-to-r from-slate-700 to-slate-900 bg-clip-text text-transparent">
-            Why Choose AI Scheduler?
-          </h2>
-          <div className="grid md:grid-cols-2 gap-6 max-w-4xl mx-auto">
-            {[
-              "Save 5+ hours per week on content creation",
-              "Maintain consistent LinkedIn presence",
-              "AI learns and adapts to your voice",
-              "Professional dashboard for full control",
-              "Automated scheduling with Postly integration",
-              "Built-in analytics and performance tracking"
-            ].map((benefit, index) => (
-              <div key={index} className="flex items-center gap-3 text-left">
-                <div className="w-6 h-6 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
-                  <Check className="h-4 w-4 text-green-600" />
-                </div>
-                <span className="text-slate-700">{benefit}</span>
+          <Card className="bg-gradient-to-r from-blue-600 to-purple-600 border-0 text-white">
+            <CardContent className="p-12">
+              <h2 className="text-3xl font-bold mb-4">Ready to Transform Your LinkedIn Strategy?</h2>
+              <p className="text-blue-100 mb-8 text-lg">
+                Join thousands of professionals who are already using AI to grow their LinkedIn presence.
+              </p>
+              <div className="flex items-center justify-center gap-4">
+                <Button 
+                  size="lg" 
+                  variant="secondary"
+                  onClick={handleGetStarted}
+                  className="bg-white text-blue-600 hover:bg-gray-100 text-lg px-8 py-3"
+                >
+                  Get Started Free
+                  <ArrowRight className="ml-2 h-5 w-5" />
+                </Button>
               </div>
-            ))}
-          </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
     </div>

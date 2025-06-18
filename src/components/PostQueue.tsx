@@ -13,68 +13,22 @@ import {
   Edit, 
   Trash2,
   ExternalLink,
-  RefreshCw
+  RefreshCw,
+  Loader2
 } from "lucide-react";
-
-interface Post {
-  id: string;
-  content: string;
-  topic: string;
-  status: "generated" | "scheduled" | "posted" | "failed";
-  scheduledDate: string;
-  scheduledTime: string;
-  postlyId?: string;
-  linkedinUrl?: string;
-  createdAt: string;
-  engagement?: {
-    likes: number;
-    comments: number;
-    shares: number;
-  };
-}
+import { usePosts } from "@/hooks/usePosts";
 
 const PostQueue = () => {
-  const [posts] = useState<Post[]>([
-    {
-      id: "1",
-      content: "🚀 Just discovered an amazing React pattern that has completely changed how I approach component composition...\n\nThe compound component pattern allows you to create flexible, reusable components that maintain clean APIs while giving users maximum control over rendering.\n\nHere's what makes it powerful:\n✅ Separation of concerns\n✅ Flexible composition\n✅ Clean prop drilling solution\n✅ Better developer experience\n\nHave you used this pattern in your projects? What's your favorite React pattern?\n\n#React #WebDevelopment #JavaScript #Frontend",
-      topic: "React Best Practices",
-      status: "posted",
-      scheduledDate: "2024-01-15",
-      scheduledTime: "10:00",
-      postlyId: "px_123456",
-      linkedinUrl: "https://linkedin.com/posts/...",
-      createdAt: "2024-01-14",
-      engagement: { likes: 42, comments: 8, shares: 5 }
-    },
-    {
-      id: "2", 
-      content: "💡 Career growth isn't just about technical skills...\n\nAfter 5 years in tech, I've learned that the most successful developers master these 'soft' skills:\n\n🎯 Communication - Explaining complex concepts simply\n🤝 Collaboration - Working effectively with diverse teams\n📈 Business thinking - Understanding the 'why' behind features\n🔄 Adaptability - Embracing change and new technologies\n⚡ Problem-solving - Breaking down complex challenges\n\nTechnical skills get you in the door, but these skills accelerate your career.\n\nWhich skill has had the biggest impact on your career?\n\n#CareerGrowth #SoftwareDevelopment #ProfessionalDevelopment",
-      topic: "Developer Career Growth",
-      status: "scheduled",
-      scheduledDate: "2024-01-17",
-      scheduledTime: "10:00",
-      postlyId: "px_123457",
-      createdAt: "2024-01-14"
-    },
-    {
-      id: "3",
-      content: "🏠 Remote work productivity secrets from 3 years of distributed teams...\n\nWorking remotely taught me that productivity isn't about hours logged - it's about intentional habits:\n\n⏰ Time blocking - Dedicated focus periods for deep work\n🎯 Clear boundaries - Physical and mental separation of work/life\n📱 Async communication - Respect for different schedules\n🌱 Continuous learning - Investing in skills during flexible hours\n💪 Health first - Regular breaks and movement\n\nThe key? Treat remote work as a skill to develop, not just a location change.\n\nWhat's your best remote work tip?\n\n#RemoteWork #Productivity #WorkFromHome #DistributedTeams",
-      topic: "Remote Work Productivity", 
-      status: "generated",
-      scheduledDate: "2024-01-19",
-      scheduledTime: "10:00",
-      createdAt: "2024-01-14"
-    }
-  ]);
+  const { posts, loading, deletePost } = usePosts();
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case "posted": return "bg-green-100 text-green-800";
-      case "scheduled": return "bg-blue-100 text-blue-800";
-      case "generated": return "bg-yellow-100 text-yellow-800";
-      case "failed": return "bg-red-100 text-red-800";
-      default: return "bg-gray-100 text-gray-800";
+      case "posted": return "bg-green-100 text-green-800 border-green-200";
+      case "scheduled": return "bg-blue-100 text-blue-800 border-blue-200";
+      case "generated": return "bg-yellow-100 text-yellow-800 border-yellow-200";
+      case "draft": return "bg-purple-100 text-purple-800 border-purple-200";
+      case "failed": return "bg-red-100 text-red-800 border-red-200";
+      default: return "bg-gray-100 text-gray-800 border-gray-200";
     }
   };
 
@@ -83,6 +37,7 @@ const PostQueue = () => {
       case "posted": return <CheckCircle className="h-4 w-4" />;
       case "scheduled": return <Clock className="h-4 w-4" />;
       case "generated": return <RefreshCw className="h-4 w-4" />;
+      case "draft": return <Edit className="h-4 w-4" />;
       case "failed": return <AlertCircle className="h-4 w-4" />;
       default: return <Clock className="h-4 w-4" />;
     }
@@ -93,7 +48,11 @@ const PostQueue = () => {
     return posts.filter(post => post.status === status);
   };
 
-  const PostCard = ({ post }: { post: Post }) => (
+  const handleDeletePost = async (id: string) => {
+    await deletePost(id);
+  };
+
+  const PostCard = ({ post }: { post: any }) => (
     <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300">
       <CardHeader className="pb-3">
         <div className="flex justify-between items-start">
@@ -103,35 +62,51 @@ const PostQueue = () => {
                 {getStatusIcon(post.status)}
                 <span className="ml-1 capitalize">{post.status}</span>
               </Badge>
-              <Badge variant="outline" className="bg-slate-50">
-                {post.topic}
-              </Badge>
+              {post.topics?.title && (
+                <Badge variant="outline" className="bg-slate-50">
+                  {post.topics.title}
+                </Badge>
+              )}
             </div>
             <div className="flex items-center gap-4 text-sm text-slate-600">
-              <span className="flex items-center gap-1">
-                <Calendar className="h-4 w-4" />
-                {post.scheduledDate}
-              </span>
-              <span className="flex items-center gap-1">
-                <Clock className="h-4 w-4" />
-                {post.scheduledTime}
-              </span>
+              {post.scheduled_date && (
+                <span className="flex items-center gap-1">
+                  <Calendar className="h-4 w-4" />
+                  {new Date(post.scheduled_date).toLocaleDateString()}
+                </span>
+              )}
+              {post.scheduled_time && (
+                <span className="flex items-center gap-1">
+                  <Clock className="h-4 w-4" />
+                  {post.scheduled_time}
+                </span>
+              )}
             </div>
           </div>
           <div className="flex gap-2">
             <Button size="sm" variant="outline">
               <Eye className="h-4 w-4" />
             </Button>
-            {post.status === "generated" && (
+            {(post.status === "generated" || post.status === "draft") && (
               <Button size="sm" variant="outline">
                 <Edit className="h-4 w-4" />
               </Button>
             )}
-            {post.linkedinUrl && (
-              <Button size="sm" variant="outline">
-                <ExternalLink className="h-4 w-4" />
+            {post.linkedin_url && (
+              <Button size="sm" variant="outline" asChild>
+                <a href={post.linkedin_url} target="_blank" rel="noopener noreferrer">
+                  <ExternalLink className="h-4 w-4" />
+                </a>
               </Button>
             )}
+            <Button 
+              size="sm" 
+              variant="outline" 
+              className="text-red-600 hover:text-red-700 hover:bg-red-50"
+              onClick={() => handleDeletePost(post.id)}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
           </div>
         </div>
       </CardHeader>
@@ -143,23 +118,35 @@ const PostQueue = () => {
             </p>
           </div>
           
-          {post.engagement && (
+          {(post.engagement_likes > 0 || post.engagement_comments > 0 || post.engagement_shares > 0) && (
             <div className="flex items-center gap-4 text-sm text-slate-600">
-              <span>👍 {post.engagement.likes}</span>
-              <span>💬 {post.engagement.comments}</span>
-              <span>🔄 {post.engagement.shares}</span>
+              <span>👍 {post.engagement_likes}</span>
+              <span>💬 {post.engagement_comments}</span>
+              <span>🔄 {post.engagement_shares}</span>
             </div>
           )}
           
-          {post.postlyId && (
+          {post.postly_id && (
             <div className="text-xs text-slate-500">
-              Postly ID: {post.postlyId}
+              Postly ID: {post.postly_id}
             </div>
           )}
+          
+          <div className="text-xs text-slate-500">
+            Created: {new Date(post.created_at).toLocaleDateString()}
+          </div>
         </div>
       </CardContent>
     </Card>
   );
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -176,7 +163,7 @@ const PostQueue = () => {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
         <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg">
           <CardContent className="p-4">
             <div className="flex items-center gap-2">
@@ -213,6 +200,17 @@ const PostQueue = () => {
         <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg">
           <CardContent className="p-4">
             <div className="flex items-center gap-2">
+              <Edit className="h-4 w-4 text-purple-500" />
+              <span className="text-sm text-slate-600">Drafts</span>
+            </div>
+            <div className="text-2xl font-bold text-slate-900 mt-1">
+              {posts.filter(p => p.status === "draft").length}
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2">
               <AlertCircle className="h-4 w-4 text-red-500" />
               <span className="text-sm text-slate-600">Failed</span>
             </div>
@@ -223,56 +221,41 @@ const PostQueue = () => {
         </Card>
       </div>
 
-      {/* Tabs for filtering */}
-      <Tabs defaultValue="all" className="w-full">
-        <TabsList className="grid w-full grid-cols-5 bg-white/60 backdrop-blur-sm">
-          <TabsTrigger value="all" className="data-[state=active]:bg-white">All Posts</TabsTrigger>
-          <TabsTrigger value="generated" className="data-[state=active]:bg-white">Generated</TabsTrigger>
-          <TabsTrigger value="scheduled" className="data-[state=active]:bg-white">Scheduled</TabsTrigger>
-          <TabsTrigger value="posted" className="data-[state=active]:bg-white">Posted</TabsTrigger>
-          <TabsTrigger value="failed" className="data-[state=active]:bg-white">Failed</TabsTrigger>
-        </TabsList>
+      {/* Content */}
+      {posts.length === 0 ? (
+        <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg">
+          <CardContent className="p-12 text-center">
+            <RefreshCw className="h-12 w-12 text-slate-400 mx-auto mb-4" />
+            <h3 className="text-lg font-semibold text-slate-900 mb-2">No posts yet</h3>
+            <p className="text-slate-600 mb-4">Start generating content to see your posts here</p>
+            <Button className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Generate Your First Post
+            </Button>
+          </CardContent>
+        </Card>
+      ) : (
+        <Tabs defaultValue="all" className="w-full">
+          <TabsList className="grid w-full grid-cols-6 bg-white/60 backdrop-blur-sm">
+            <TabsTrigger value="all" className="data-[state=active]:bg-white">All Posts</TabsTrigger>
+            <TabsTrigger value="draft" className="data-[state=active]:bg-white">Drafts</TabsTrigger>
+            <TabsTrigger value="generated" className="data-[state=active]:bg-white">Generated</TabsTrigger>
+            <TabsTrigger value="scheduled" className="data-[state=active]:bg-white">Scheduled</TabsTrigger>
+            <TabsTrigger value="posted" className="data-[state=active]:bg-white">Posted</TabsTrigger>
+            <TabsTrigger value="failed" className="data-[state=active]:bg-white">Failed</TabsTrigger>
+          </TabsList>
 
-        <TabsContent value="all" className="mt-6">
-          <div className="grid gap-4">
-            {posts.map((post) => (
-              <PostCard key={post.id} post={post} />
-            ))}
-          </div>
-        </TabsContent>
-
-        <TabsContent value="generated" className="mt-6">
-          <div className="grid gap-4">
-            {filterPostsByStatus("generated").map((post) => (
-              <PostCard key={post.id} post={post} />
-            ))}
-          </div>
-        </TabsContent>
-
-        <TabsContent value="scheduled" className="mt-6">
-          <div className="grid gap-4">
-            {filterPostsByStatus("scheduled").map((post) => (
-              <PostCard key={post.id} post={post} />
-            ))}
-          </div>
-        </TabsContent>
-
-        <TabsContent value="posted" className="mt-6">
-          <div className="grid gap-4">
-            {filterPostsByStatus("posted").map((post) => (
-              <PostCard key={post.id} post={post} />
-            ))}
-          </div>
-        </TabsContent>
-
-        <TabsContent value="failed" className="mt-6">
-          <div className="grid gap-4">
-            {filterPostsByStatus("failed").map((post) => (
-              <PostCard key={post.id} post={post} />
-            ))}
-          </div>
-        </TabsContent>
-      </Tabs>
+          {["all", "draft", "generated", "scheduled", "posted", "failed"].map((status) => (
+            <TabsContent key={status} value={status} className="mt-6">
+              <div className="grid gap-4">
+                {filterPostsByStatus(status).map((post) => (
+                  <PostCard key={post.id} post={post} />
+                ))}
+              </div>
+            </TabsContent>
+          ))}
+        </Tabs>
+      )}
     </div>
   );
 };

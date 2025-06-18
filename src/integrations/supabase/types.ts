@@ -9,7 +9,137 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      posts: {
+        Row: {
+          content: string
+          created_at: string
+          engagement_comments: number | null
+          engagement_likes: number | null
+          engagement_shares: number | null
+          id: string
+          linkedin_url: string | null
+          posted_at: string | null
+          postly_id: string | null
+          scheduled_date: string | null
+          scheduled_time: string | null
+          status: string
+          title: string | null
+          topic_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          engagement_comments?: number | null
+          engagement_likes?: number | null
+          engagement_shares?: number | null
+          id?: string
+          linkedin_url?: string | null
+          posted_at?: string | null
+          postly_id?: string | null
+          scheduled_date?: string | null
+          scheduled_time?: string | null
+          status: string
+          title?: string | null
+          topic_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          engagement_comments?: number | null
+          engagement_likes?: number | null
+          engagement_shares?: number | null
+          id?: string
+          linkedin_url?: string | null
+          posted_at?: string | null
+          postly_id?: string | null
+          scheduled_date?: string | null
+          scheduled_time?: string | null
+          status?: string
+          title?: string | null
+          topic_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "posts_topic_id_fkey"
+            columns: ["topic_id"]
+            isOneToOne: false
+            referencedRelation: "topics"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          email: string | null
+          full_name: string | null
+          id: string
+          linkedin_profile: string | null
+          updated_at: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          email?: string | null
+          full_name?: string | null
+          id: string
+          linkedin_profile?: string | null
+          updated_at?: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          email?: string | null
+          full_name?: string | null
+          id?: string
+          linkedin_profile?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      topics: {
+        Row: {
+          category: string
+          created_at: string
+          description: string | null
+          id: string
+          priority: string
+          title: string
+          updated_at: string
+          usage_count: number
+          user_id: string
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          priority: string
+          title: string
+          updated_at?: string
+          usage_count?: number
+          user_id: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          priority?: string
+          title?: string
+          updated_at?: string
+          usage_count?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
