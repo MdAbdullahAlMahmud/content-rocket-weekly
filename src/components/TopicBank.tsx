@@ -66,7 +66,7 @@ const TopicBank = () => {
     title: "",
     description: "",
     category: "",
-    priority: "medium" as const
+    priority: "medium" as "high" | "medium" | "low"
   });
 
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
