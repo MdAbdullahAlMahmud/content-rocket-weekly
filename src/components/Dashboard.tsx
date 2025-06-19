@@ -1,12 +1,11 @@
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { 
   Calendar, 
   Brain, 
   CheckCircle,
-  ArrowLeft,
   Settings as SettingsIcon
 } from "lucide-react";
 import TopicBank from "@/components/TopicBank";
@@ -19,7 +18,6 @@ import { Button } from "@/components/ui/button";
 import { useTopics } from "@/hooks/useTopics";
 import { usePosts } from "@/hooks/usePosts";
 import { useDefaultTopics } from "@/hooks/useDefaultTopics";
-import { useNavigate } from "react-router-dom";
 
 interface DashboardProps {
   onBack: () => void;
@@ -30,7 +28,6 @@ const Dashboard = ({ onBack }: DashboardProps) => {
   const { topics } = useTopics();
   const { posts } = usePosts();
   const { isPopulating } = useDefaultTopics();
-  const navigate = useNavigate();
 
   const renderTabContent = () => {
     switch (activeTab) {
@@ -59,16 +56,11 @@ const Dashboard = ({ onBack }: DashboardProps) => {
             <div className="flex items-center justify-between p-4">
               <div className="flex items-center gap-4">
                 <SidebarTrigger />
-                <div className="flex items-center gap-2">
-                  <Button variant="ghost" size="sm" onClick={() => navigate('/')}>
-                    <ArrowLeft className="h-4 w-4" />
-                  </Button>
-                  <div>
-                    <h1 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                      LinkedIn AI Scheduler
-                    </h1>
-                    <p className="text-sm text-slate-600">Automate your LinkedIn content strategy</p>
-                  </div>
+                <div>
+                  <h1 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                    LinkedIn AI Scheduler
+                  </h1>
+                  <p className="text-sm text-slate-600">Automate your LinkedIn content strategy</p>
                 </div>
               </div>
               <div className="flex items-center gap-3">

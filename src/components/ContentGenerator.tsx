@@ -12,9 +12,9 @@ import {
   Copy, 
   Check, 
   Calendar,
-  Settings,
   Sparkles,
-  AlertCircle
+  AlertCircle,
+  Loader2
 } from "lucide-react";
 import { useTopics } from "@/hooks/useTopics";
 import { useSettings } from "@/hooks/useSettings";
@@ -32,6 +32,7 @@ const ContentGenerator = () => {
   const [isScheduling, setIsScheduling] = useState(false);
   const [generatedContent, setGeneratedContent] = useState("");
   const [isCopied, setIsCopied] = useState(false);
+  const [generationStatus, setGenerationStatus] = useState("");
   
   const { topics } = useTopics();
   const { settings } = useSettings();
@@ -72,32 +73,33 @@ const ContentGenerator = () => {
     }
 
     setIsGenerating(true);
+    setGenerationStatus("Connecting to OpenAI...");
     
     try {
       const selectedTopicData = topics.find(t => t.id === selectedTopic);
-      const prompt = `Create a LinkedIn post about "${selectedTopicData?.title}". 
-      ${selectedTopicData?.description ? `Context: ${selectedTopicData.description}` : ''}
-      ${customPrompt ? `Additional instructions: ${customPrompt}` : ''}
       
-      Tone: ${tone}
-      Length: ${length}
+      setGenerationStatus("Generating content...");
       
-      Make it engaging, professional, and suitable for LinkedIn. Include relevant emojis and hashtags.`;
-
       const { data, error } = await supabase.functions.invoke('generate-content', {
-        body: { prompt }
+        body: { 
+          topicId: selectedTopic,
+          topicTitle: selectedTopicData?.title,
+          topicDescription: selectedTopicData?.description,
+          tone,
+          length,
+          customPrompt
+        }
       });
 
       if (error) throw error;
       
-      setGeneratedContent(data.generatedText);
+      setGeneratedContent(data.content);
+      setGenerationStatus("Content generated successfully!");
       
-      // Increment topic usage count
-      if (selectedTopicData) {
-        await supabase.rpc('increment_topic_usage', { 
-          topic_id: selectedTopic 
-        });
-      }
+      toast({
+        title: "Content Generated",
+        description: "Your LinkedIn post has been created successfully!"
+      });
       
     } catch (error: any) {
       console.error('Error generating content:', error);
@@ -106,14 +108,20 @@ const ContentGenerator = () => {
         description: error.message || "Failed to generate content. Please try again.",
         variant: "destructive"
       });
+      setGenerationStatus("");
     } finally {
       setIsGenerating(false);
+      setTimeout(() => setGenerationStatus(""), 3000);
     }
   };
 
   const handleCopy = () => {
     navigator.clipboard.writeText(generatedContent);
     setIsCopied(true);
+    toast({
+      title: "Copied to clipboard",
+      description: "Content has been copied to your clipboard."
+    });
     setTimeout(() => setIsCopied(false), 2000);
   };
 
@@ -161,12 +169,6 @@ const ContentGenerator = () => {
         <div>
           <h2 className="text-2xl font-bold text-slate-900">Content Generator</h2>
           <p className="text-slate-600">Create AI-powered LinkedIn posts from your topics</p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline">
-            <Settings className="h-4 w-4 mr-2" />
-            AI Settings
-          </Button>
         </div>
       </div>
 
@@ -280,8 +282,8 @@ const ContentGenerator = () => {
             >
               {isGenerating ? (
                 <>
-                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                  Generating...
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  {generationStatus || "Generating..."}
                 </>
               ) : (
                 <>
@@ -351,7 +353,7 @@ const ContentGenerator = () => {
                     className="flex-1 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700"
                   >
                     {isScheduling ? (
-                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                     ) : (
                       <Calendar className="h-4 w-4 mr-2" />
                     )}

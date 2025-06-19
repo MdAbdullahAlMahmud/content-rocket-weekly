@@ -25,7 +25,7 @@ export const useSettings = () => {
     try {
       setLoading(true);
       const { data, error } = await supabase
-        .from('user_settings' as any)
+        .from('user_settings')
         .select('*')
         .eq('user_id', user.id)
         .maybeSingle();
@@ -44,7 +44,7 @@ export const useSettings = () => {
 
     try {
       const { data, error } = await supabase
-        .from('user_settings' as any)
+        .from('user_settings')
         .upsert({
           user_id: user.id,
           ...updates

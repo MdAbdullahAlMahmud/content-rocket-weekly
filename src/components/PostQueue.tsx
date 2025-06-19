@@ -4,6 +4,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Textarea } from "@/components/ui/textarea";
 import { 
   Calendar, 
   Clock, 
@@ -14,12 +17,18 @@ import {
   Trash2,
   ExternalLink,
   RefreshCw,
-  Loader2
+  Loader2,
+  Save
 } from "lucide-react";
 import { usePosts } from "@/hooks/usePosts";
+import { useToast } from "@/hooks/use-toast";
 
 const PostQueue = () => {
-  const { posts, loading, deletePost } = usePosts();
+  const { posts, loading, deletePost, updatePost } = usePosts();
+  const { toast } = useToast();
+  const [editingPost, setEditingPost] = useState<string | null>(null);
+  const [editContent, setEditContent] = useState("");
+  const [isEditing, setIsEditing] = useState(false);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -49,7 +58,47 @@ const PostQueue = () => {
   };
 
   const handleDeletePost = async (id: string) => {
-    await deletePost(id);
+    try {
+      await deletePost(id);
+      toast({
+        title: "Post deleted",
+        description: "The post has been removed successfully."
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to delete the post. Please try again.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleEditPost = (post: any) => {
+    setEditingPost(post.id);
+    setEditContent(post.content);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingPost) return;
+    
+    setIsEditing(true);
+    try {
+      await updatePost(editingPost, { content: editContent });
+      setEditingPost(null);
+      setEditContent("");
+      toast({
+        title: "Post updated",
+        description: "Your changes have been saved successfully."
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to update the post. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsEditing(false);
+    }
   };
 
   const PostCard = ({ post }: { post: any }) => (
@@ -84,14 +133,72 @@ const PostQueue = () => {
             </div>
           </div>
           <div className="flex gap-2">
-            <Button size="sm" variant="outline">
-              <Eye className="h-4 w-4" />
-            </Button>
+            {/* Preview Dialog */}
+            <Dialog>
+              <DialogTrigger asChild>
+                <Button size="sm" variant="outline">
+                  <Eye className="h-4 w-4" />
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-2xl">
+                <DialogHeader>
+                  <DialogTitle>Post Preview</DialogTitle>
+                  <DialogDescription>
+                    {post.topics?.title && `Topic: ${post.topics.title}`}
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="bg-slate-50 rounded-lg p-4 max-h-96 overflow-y-auto">
+                  <p className="text-slate-700 whitespace-pre-line">{post.content}</p>
+                </div>
+              </DialogContent>
+            </Dialog>
+
+            {/* Edit Dialog */}
             {(post.status === "generated" || post.status === "draft") && (
-              <Button size="sm" variant="outline">
-                <Edit className="h-4 w-4" />
-              </Button>
+              <Dialog>
+                <DialogTrigger asChild>
+                  <Button size="sm" variant="outline" onClick={() => handleEditPost(post)}>
+                    <Edit className="h-4 w-4" />
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-2xl">
+                  <DialogHeader>
+                    <DialogTitle>Edit Post</DialogTitle>
+                    <DialogDescription>
+                      Make changes to your post content below.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <Textarea
+                      value={editContent}
+                      onChange={(e) => setEditContent(e.target.value)}
+                      rows={10}
+                      className="resize-none"
+                    />
+                    <div className="flex gap-2 justify-end">
+                      <Button variant="outline" onClick={() => setEditingPost(null)}>
+                        Cancel
+                      </Button>
+                      <Button onClick={handleSaveEdit} disabled={isEditing}>
+                        {isEditing ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Saving...
+                          </>
+                        ) : (
+                          <>
+                            <Save className="h-4 w-4 mr-2" />
+                            Save Changes
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                </DialogContent>
+              </Dialog>
             )}
+
+            {/* External Link */}
             {post.linkedin_url && (
               <Button size="sm" variant="outline" asChild>
                 <a href={post.linkedin_url} target="_blank" rel="noopener noreferrer">
@@ -99,14 +206,36 @@ const PostQueue = () => {
                 </a>
               </Button>
             )}
-            <Button 
-              size="sm" 
-              variant="outline" 
-              className="text-red-600 hover:text-red-700 hover:bg-red-50"
-              onClick={() => handleDeletePost(post.id)}
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
+
+            {/* Delete Dialog */}
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button 
+                  size="sm" 
+                  variant="outline" 
+                  className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete Post</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Are you sure you want to delete this post? This action cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={() => handleDeletePost(post.id)}
+                    className="bg-red-600 hover:bg-red-700"
+                  >
+                    Delete
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </div>
         </div>
       </CardHeader>
@@ -156,10 +285,6 @@ const PostQueue = () => {
           <h2 className="text-2xl font-bold text-slate-900">Post Queue</h2>
           <p className="text-slate-600">Manage your scheduled and published LinkedIn posts</p>
         </div>
-        <Button className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
-          <RefreshCw className="h-4 w-4 mr-2" />
-          Generate New Posts
-        </Button>
       </div>
 
       {/* Stats */}
@@ -228,10 +353,6 @@ const PostQueue = () => {
             <RefreshCw className="h-12 w-12 text-slate-400 mx-auto mb-4" />
             <h3 className="text-lg font-semibold text-slate-900 mb-2">No posts yet</h3>
             <p className="text-slate-600 mb-4">Start generating content to see your posts here</p>
-            <Button className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Generate Your First Post
-            </Button>
           </CardContent>
         </Card>
       ) : (
