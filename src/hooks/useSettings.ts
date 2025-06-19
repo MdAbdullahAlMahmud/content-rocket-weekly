@@ -6,6 +6,7 @@ import { useToast } from '@/hooks/use-toast';
 
 export interface UserSettings {
   id: string;
+  user_id: string;
   openai_api_key?: string;
   postly_api_key?: string;
   created_at: string;
@@ -24,10 +25,10 @@ export const useSettings = () => {
     try {
       setLoading(true);
       const { data, error } = await supabase
-        .from('user_settings')
+        .from('user_settings' as any)
         .select('*')
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
 
       if (error && error.code !== 'PGRST116') throw error;
       setSettings(data);
@@ -43,7 +44,7 @@ export const useSettings = () => {
 
     try {
       const { data, error } = await supabase
-        .from('user_settings')
+        .from('user_settings' as any)
         .upsert({
           user_id: user.id,
           ...updates

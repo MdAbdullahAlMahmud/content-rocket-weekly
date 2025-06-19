@@ -2,7 +2,6 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
@@ -14,8 +13,15 @@ import {
   Check, 
   Calendar,
   Settings,
-  Sparkles
+  Sparkles,
+  AlertCircle
 } from "lucide-react";
+import { useTopics } from "@/hooks/useTopics";
+import { useSettings } from "@/hooks/useSettings";
+import { usePosts } from "@/hooks/usePosts";
+import { useToast } from "@/hooks/use-toast";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { supabase } from "@/integrations/supabase/client";
 
 const ContentGenerator = () => {
   const [selectedTopic, setSelectedTopic] = useState("");
@@ -23,16 +29,14 @@ const ContentGenerator = () => {
   const [tone, setTone] = useState("professional");
   const [length, setLength] = useState("medium");
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isScheduling, setIsScheduling] = useState(false);
   const [generatedContent, setGeneratedContent] = useState("");
   const [isCopied, setIsCopied] = useState(false);
-
-  const topics = [
-    "React Best Practices",
-    "Developer Career Growth", 
-    "Remote Work Productivity",
-    "AI in Software Development",
-    "Team Leadership"
-  ];
+  
+  const { topics } = useTopics();
+  const { settings } = useSettings();
+  const { addPost } = usePosts();
+  const { toast } = useToast();
 
   const toneOptions = [
     { value: "professional", label: "Professional" },
@@ -49,30 +53,62 @@ const ContentGenerator = () => {
   ];
 
   const handleGenerate = async () => {
+    if (!settings?.openai_api_key) {
+      toast({
+        title: "OpenAI API Key Required",
+        description: "Please add your OpenAI API key in Settings first.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!selectedTopic) {
+      toast({
+        title: "Topic Required",
+        description: "Please select a topic to generate content.",
+        variant: "destructive"
+      });
+      return;
+    }
+
     setIsGenerating(true);
     
-    // Simulate AI generation
-    setTimeout(() => {
-      const sampleContent = `🚀 The future of software development is being reshaped by AI tools, and it's happening faster than most of us anticipated.
+    try {
+      const selectedTopicData = topics.find(t => t.id === selectedTopic);
+      const prompt = `Create a LinkedIn post about "${selectedTopicData?.title}". 
+      ${selectedTopicData?.description ? `Context: ${selectedTopicData.description}` : ''}
+      ${customPrompt ? `Additional instructions: ${customPrompt}` : ''}
+      
+      Tone: ${tone}
+      Length: ${length}
+      
+      Make it engaging, professional, and suitable for LinkedIn. Include relevant emojis and hashtags.`;
 
-After spending the last few months experimenting with various AI coding assistants, I've noticed a fundamental shift in how we approach problem-solving:
+      const { data, error } = await supabase.functions.invoke('generate-content', {
+        body: { prompt }
+      });
 
-✅ Instead of writing code from scratch, we're becoming prompt engineers
-✅ Code reviews are evolving to include AI-generated suggestions
-✅ Documentation is becoming more interactive and context-aware
-✅ Debugging is getting smarter with AI-powered error detection
-
-But here's what really excites me: AI isn't replacing developers - it's amplifying our creativity and freeing us to focus on higher-level architecture and user experience decisions.
-
-The developers who thrive in this new landscape will be those who learn to collaborate effectively with AI tools while maintaining their critical thinking and problem-solving skills.
-
-What's your experience with AI coding tools? Are you finding them helpful or overwhelming?
-
-#AI #SoftwareDevelopment #FutureOfWork #TechTrends #Programming`;
-
-      setGeneratedContent(sampleContent);
+      if (error) throw error;
+      
+      setGeneratedContent(data.generatedText);
+      
+      // Increment topic usage count
+      if (selectedTopicData) {
+        await supabase.rpc('increment_topic_usage', { 
+          topic_id: selectedTopic 
+        });
+      }
+      
+    } catch (error: any) {
+      console.error('Error generating content:', error);
+      toast({
+        title: "Generation Failed",
+        description: error.message || "Failed to generate content. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
       setIsGenerating(false);
-    }, 2000);
+    }
   };
 
   const handleCopy = () => {
@@ -81,10 +117,42 @@ What's your experience with AI coding tools? Are you finding them helpful or ove
     setTimeout(() => setIsCopied(false), 2000);
   };
 
-  const handleSchedule = () => {
-    // Implementation for scheduling the post
-    console.log("Scheduling post:", generatedContent);
+  const handleSchedule = async () => {
+    if (!generatedContent) return;
+    
+    setIsScheduling(true);
+    try {
+      const selectedTopicData = topics.find(t => t.id === selectedTopic);
+      
+      await addPost({
+        topic_id: selectedTopic,
+        title: selectedTopicData?.title,
+        content: generatedContent,
+        status: 'draft'
+      });
+      
+      toast({
+        title: "Post Saved",
+        description: "Your generated content has been saved as a draft."
+      });
+      
+      // Clear the form
+      setGeneratedContent("");
+      setSelectedTopic("");
+      setCustomPrompt("");
+      
+    } catch (error: any) {
+      toast({
+        title: "Error Saving Post",
+        description: error.message,
+        variant: "destructive"
+      });
+    } finally {
+      setIsScheduling(false);
+    }
   };
+
+  const hasApiKey = !!settings?.openai_api_key;
 
   return (
     <div className="space-y-6">
@@ -99,12 +167,17 @@ What's your experience with AI coding tools? Are you finding them helpful or ove
             <Settings className="h-4 w-4 mr-2" />
             AI Settings
           </Button>
-          <Button className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
-            <Sparkles className="h-4 w-4 mr-2" />
-            Bulk Generate
-          </Button>
         </div>
       </div>
+
+      {!hasApiKey && (
+        <Alert>
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            Please add your OpenAI API key in Settings to start generating content.
+          </AlertDescription>
+        </Alert>
+      )}
 
       <div className="grid lg:grid-cols-2 gap-6">
         {/* Generation Settings */}
@@ -119,20 +192,28 @@ What's your experience with AI coding tools? Are you finding them helpful or ove
             {/* Topic Selection */}
             <div>
               <Label className="text-sm font-medium text-slate-700">Select Topic</Label>
-              <div className="grid grid-cols-1 gap-2 mt-2">
+              <div className="grid grid-cols-1 gap-2 mt-2 max-h-48 overflow-y-auto">
                 {topics.map((topic) => (
                   <button
-                    key={topic}
-                    onClick={() => setSelectedTopic(topic)}
+                    key={topic.id}
+                    onClick={() => setSelectedTopic(topic.id)}
                     className={`p-3 text-left rounded-lg border transition-all ${
-                      selectedTopic === topic
+                      selectedTopic === topic.id
                         ? "border-blue-500 bg-blue-50 text-blue-700"
                         : "border-slate-200 hover:border-slate-300 bg-white"
                     }`}
                   >
-                    {topic}
+                    <div className="font-medium">{topic.title}</div>
+                    {topic.description && (
+                      <div className="text-xs text-slate-500 mt-1">{topic.description}</div>
+                    )}
                   </button>
                 ))}
+                {topics.length === 0 && (
+                  <div className="p-4 text-center text-slate-500">
+                    No topics available. Create some topics first.
+                  </div>
+                )}
               </div>
             </div>
 
@@ -194,7 +275,7 @@ What's your experience with AI coding tools? Are you finding them helpful or ove
             {/* Generate Button */}
             <Button 
               onClick={handleGenerate}
-              disabled={!selectedTopic || isGenerating}
+              disabled={!selectedTopic || isGenerating || !hasApiKey}
               className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
             >
               {isGenerating ? (
@@ -227,7 +308,7 @@ What's your experience with AI coding tools? Are you finding them helpful or ove
                   <div className="flex justify-between items-start mb-3">
                     <div className="flex gap-2">
                       <Badge variant="outline" className="bg-white">
-                        {selectedTopic}
+                        {topics.find(t => t.id === selectedTopic)?.title}
                       </Badge>
                       <Badge variant="outline" className="bg-white capitalize">
                         {tone}
@@ -258,7 +339,7 @@ What's your experience with AI coding tools? Are you finding them helpful or ove
                   <Button 
                     variant="outline"
                     onClick={handleGenerate}
-                    disabled={isGenerating}
+                    disabled={isGenerating || !hasApiKey}
                     className="flex-1"
                   >
                     <RefreshCw className="h-4 w-4 mr-2" />
@@ -266,10 +347,15 @@ What's your experience with AI coding tools? Are you finding them helpful or ove
                   </Button>
                   <Button 
                     onClick={handleSchedule}
+                    disabled={isScheduling}
                     className="flex-1 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700"
                   >
-                    <Calendar className="h-4 w-4 mr-2" />
-                    Schedule Post
+                    {isScheduling ? (
+                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Calendar className="h-4 w-4 mr-2" />
+                    )}
+                    Save as Draft
                   </Button>
                 </div>
               </div>

@@ -12,11 +12,13 @@ import {
 import TopicBank from "@/components/TopicBank";
 import PostQueue from "@/components/PostQueue";
 import ContentGenerator from "@/components/ContentGenerator";
+import Settings from "@/components/Settings";
 import { AppSidebar } from "@/components/app-sidebar";
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { useTopics } from "@/hooks/useTopics";
 import { usePosts } from "@/hooks/usePosts";
+import { useDefaultTopics } from "@/hooks/useDefaultTopics";
 import { useNavigate } from "react-router-dom";
 
 interface DashboardProps {
@@ -27,6 +29,7 @@ const Dashboard = ({ onBack }: DashboardProps) => {
   const [activeTab, setActiveTab] = useState("overview");
   const { topics } = useTopics();
   const { posts } = usePosts();
+  const { isPopulating } = useDefaultTopics();
   const navigate = useNavigate();
 
   const renderTabContent = () => {
@@ -40,7 +43,7 @@ const Dashboard = ({ onBack }: DashboardProps) => {
       case "generate":
         return <ContentGenerator />;
       case "settings":
-        return <SettingsTab />;
+        return <Settings />;
       default:
         return <OverviewTab topics={topics} posts={posts} />;
     }
@@ -69,6 +72,11 @@ const Dashboard = ({ onBack }: DashboardProps) => {
                 </div>
               </div>
               <div className="flex items-center gap-3">
+                {isPopulating && (
+                  <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                    Setting up topics...
+                  </Badge>
+                )}
                 <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
                   ✓ Connected
                 </Badge>
@@ -174,26 +182,6 @@ const OverviewTab = ({ topics, posts }: { topics: any[], posts: any[] }) => {
               </div>
             )}
           </div>
-        </CardContent>
-      </Card>
-    </div>
-  );
-};
-
-const SettingsTab = () => {
-  return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold text-slate-900">Settings</h2>
-        <p className="text-slate-600">Manage your account and application preferences</p>
-      </div>
-      
-      <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg">
-        <CardHeader>
-          <CardTitle>Account Settings</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-slate-600">Settings panel coming soon...</p>
         </CardContent>
       </Card>
     </div>

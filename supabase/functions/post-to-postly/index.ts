@@ -1,7 +1,7 @@
 
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.50.0';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -9,137 +9,95 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { postId, scheduledDate, scheduledTime } = await req.json();
-    
-    // Get user from request
+    const { postId, content, scheduledDate, scheduledTime } = await req.json();
+
+    // Get the authorization header
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
       throw new Error('No authorization header');
     }
 
-    // Initialize Supabase client
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    // Create Supabase client
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      { global: { headers: { Authorization: authHeader } } }
+    );
 
-    // Get user ID from JWT
-    const jwt = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: userError } = await supabase.auth.getUser(jwt);
-    
+    // Get user from token
+    const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
     if (userError || !user) {
-      throw new Error('Invalid user token');
+      throw new Error('User not authenticated');
     }
 
     // Get user's Postly API key
-    const { data: settings, error: settingsError } = await supabase
+    const { data: settings, error: settingsError } = await supabaseClient
       .from('user_settings')
       .select('postly_api_key')
       .eq('user_id', user.id)
       .single();
 
     if (settingsError || !settings?.postly_api_key) {
-      throw new Error('Postly API key not found. Please add it in Settings.');
+      throw new Error('Postly API key not found. Please add your Postly API key in Settings.');
     }
 
-    // Get the post content
-    const { data: post, error: postError } = await supabase
-      .from('posts')
-      .select('*')
-      .eq('id', postId)
-      .eq('user_id', user.id)
-      .single();
-
-    if (postError || !post) {
-      throw new Error('Post not found');
-    }
-
-    console.log('Posting to Postly:', { postId, content: post.content.substring(0, 50) + '...' });
-
-    // Prepare the post data for Postly
-    const postData = {
-      content: post.content,
-      platforms: ['linkedin'], // Default to LinkedIn
-      ...(scheduledDate && scheduledTime && {
-        scheduled_at: `${scheduledDate}T${scheduledTime}:00Z`
-      })
-    };
-
-    // Call Postly API (Note: This is a placeholder - adjust based on actual Postly API)
-    const response = await fetch('https://api.postly.com/v1/posts', {
+    // Post to Postly API
+    const postlyResponse = await fetch('https://api.postly.io/v1/posts', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${settings.postly_api_key}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(postData),
+      body: JSON.stringify({
+        content: content,
+        platforms: ['linkedin'],
+        scheduled_at: scheduledDate && scheduledTime ? 
+          `${scheduledDate}T${scheduledTime}:00.000Z` : undefined
+      }),
     });
 
-    if (!response.ok) {
-      const errorData = await response.text();
-      console.error('Postly API error:', errorData);
-      throw new Error(`Postly API error: ${response.status}`);
+    if (!postlyResponse.ok) {
+      const errorData = await postlyResponse.text();
+      throw new Error(`Postly API error: ${errorData}`);
     }
 
-    const postlyResponse = await response.json();
-    console.log('Postly response:', postlyResponse);
+    const postlyData = await postlyResponse.json();
 
-    // Update the post with Postly information
-    const updateData: any = {
-      postly_id: postlyResponse.id,
-      status: scheduledDate ? 'scheduled' : 'posted',
-      ...(scheduledDate && { scheduled_date: scheduledDate }),
-      ...(scheduledTime && { scheduled_time: scheduledTime }),
-      ...(!scheduledDate && { posted_at: new Date().toISOString() })
-    };
-
-    const { error: updateError } = await supabase
+    // Update the post in our database
+    const { error: updateError } = await supabaseClient
       .from('posts')
-      .update(updateData)
+      .update({
+        status: scheduledDate ? 'scheduled' : 'posted',
+        postly_id: postlyData.id,
+        posted_at: scheduledDate ? null : new Date().toISOString(),
+        scheduled_date: scheduledDate || null,
+        scheduled_time: scheduledTime || null,
+      })
       .eq('id', postId);
 
     if (updateError) {
-      console.error('Error updating post:', updateError);
       throw updateError;
     }
 
     return new Response(JSON.stringify({ 
-      success: true,
-      postlyId: postlyResponse.id,
-      status: updateData.status
+      success: true, 
+      postlyData,
+      message: scheduledDate ? 'Post scheduled successfully' : 'Post published successfully'
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
   } catch (error: any) {
     console.error('Error in post-to-postly function:', error);
-    
-    // Mark post as failed if we have a postId
-    try {
-      const { postId } = await req.json();
-      if (postId) {
-        const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-        const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-        const supabase = createClient(supabaseUrl, supabaseServiceKey);
-        
-        await supabase
-          .from('posts')
-          .update({ status: 'failed' })
-          .eq('id', postId);
-      }
-    } catch (updateError) {
-      console.error('Error marking post as failed:', updateError);
-    }
-
     return new Response(JSON.stringify({ 
-      error: error.message || 'Failed to post to Postly' 
+      error: error.message 
     }), {
-      status: 500,
+      status: 400,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
