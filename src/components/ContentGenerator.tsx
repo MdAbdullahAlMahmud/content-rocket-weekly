@@ -11,7 +11,8 @@ import {
   RefreshCw, 
   Copy, 
   Check, 
-  Calendar,
+  Save,
+  Send,
   Sparkles,
   AlertCircle,
   Loader2
@@ -22,17 +23,21 @@ import { usePosts } from "@/hooks/usePosts";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { supabase } from "@/integrations/supabase/client";
+import TopicSelector from "./TopicSelector";
+import PostScheduler from "./PostScheduler";
 
 const ContentGenerator = () => {
-  const [selectedTopic, setSelectedTopic] = useState("");
+  const [selectedTopics, setSelectedTopics] = useState<string[]>([]);
   const [customPrompt, setCustomPrompt] = useState("");
   const [tone, setTone] = useState("professional");
   const [length, setLength] = useState("medium");
   const [isGenerating, setIsGenerating] = useState(false);
-  const [isScheduling, setIsScheduling] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [generatedContent, setGeneratedContent] = useState("");
+  const [generatedPostId, setGeneratedPostId] = useState<string | null>(null);
   const [isCopied, setIsCopied] = useState(false);
   const [generationStatus, setGenerationStatus] = useState("");
+  const [showScheduler, setShowScheduler] = useState(false);
   
   const { topics } = useTopics();
   const { settings } = useSettings();
@@ -63,11 +68,11 @@ const ContentGenerator = () => {
       return;
     }
 
-    if (!selectedTopic) {
+    if (selectedTopics.length === 0) {
       toast({
         title: "Topic Required",
-        description: "Please select a topic to generate content.",
-        variant: "destructive"
+        description: "Please select at least one topic to generate content.",
+        variant: "descriptive"
       });
       return;
     }
@@ -76,13 +81,13 @@ const ContentGenerator = () => {
     setGenerationStatus("Connecting to OpenAI...");
     
     try {
-      const selectedTopicData = topics.find(t => t.id === selectedTopic);
+      const selectedTopicData = topics.find(t => selectedTopics.includes(t.id));
       
       setGenerationStatus("Generating content...");
       
       const { data, error } = await supabase.functions.invoke('generate-content', {
         body: { 
-          topicId: selectedTopic,
+          topicId: selectedTopics[0], // Use first selected topic
           topicTitle: selectedTopicData?.title,
           topicDescription: selectedTopicData?.description,
           tone,
@@ -94,6 +99,7 @@ const ContentGenerator = () => {
       if (error) throw error;
       
       setGeneratedContent(data.content);
+      setGeneratedPostId(data.postId);
       setGenerationStatus("Content generated successfully!");
       
       toast({
@@ -125,39 +131,58 @@ const ContentGenerator = () => {
     setTimeout(() => setIsCopied(false), 2000);
   };
 
-  const handleSchedule = async () => {
+  const handleSaveDraft = async () => {
     if (!generatedContent) return;
     
-    setIsScheduling(true);
+    setIsSaving(true);
     try {
-      const selectedTopicData = topics.find(t => t.id === selectedTopic);
+      const selectedTopicData = topics.find(t => selectedTopics.includes(t.id));
       
       await addPost({
-        topic_id: selectedTopic,
+        topic_id: selectedTopics[0],
         title: selectedTopicData?.title,
         content: generatedContent,
         status: 'draft'
       });
       
       toast({
-        title: "Post Saved",
+        title: "Draft Saved",
         description: "Your generated content has been saved as a draft."
       });
       
       // Clear the form
       setGeneratedContent("");
-      setSelectedTopic("");
+      setGeneratedPostId(null);
+      setSelectedTopics([]);
       setCustomPrompt("");
       
     } catch (error: any) {
       toast({
-        title: "Error Saving Post",
+        title: "Error Saving Draft",
         description: error.message,
         variant: "destructive"
       });
     } finally {
-      setIsScheduling(false);
+      setIsSaving(false);
     }
+  };
+
+  const handlePublishToPostly = () => {
+    if (!generatedContent || !generatedPostId) {
+      toast({
+        title: "No Content to Publish",
+        description: "Please generate content first.",
+        variant: "destructive"
+      });
+      return;
+    }
+    setShowScheduler(true);
+  };
+
+  const getSelectedTopicTitle = () => {
+    if (selectedTopics.length === 0) return "";
+    const topic = topics.find(t => t.id === selectedTopics[0]);
+    return topic?.title || "";
   };
 
   const hasApiKey = !!settings?.openai_api_key;
@@ -192,32 +217,10 @@ const ContentGenerator = () => {
           </CardHeader>
           <CardContent className="space-y-6">
             {/* Topic Selection */}
-            <div>
-              <Label className="text-sm font-medium text-slate-700">Select Topic</Label>
-              <div className="grid grid-cols-1 gap-2 mt-2 max-h-48 overflow-y-auto">
-                {topics.map((topic) => (
-                  <button
-                    key={topic.id}
-                    onClick={() => setSelectedTopic(topic.id)}
-                    className={`p-3 text-left rounded-lg border transition-all ${
-                      selectedTopic === topic.id
-                        ? "border-blue-500 bg-blue-50 text-blue-700"
-                        : "border-slate-200 hover:border-slate-300 bg-white"
-                    }`}
-                  >
-                    <div className="font-medium">{topic.title}</div>
-                    {topic.description && (
-                      <div className="text-xs text-slate-500 mt-1">{topic.description}</div>
-                    )}
-                  </button>
-                ))}
-                {topics.length === 0 && (
-                  <div className="p-4 text-center text-slate-500">
-                    No topics available. Create some topics first.
-                  </div>
-                )}
-              </div>
-            </div>
+            <TopicSelector
+              selectedTopics={selectedTopics}
+              onTopicsChange={setSelectedTopics}
+            />
 
             {/* Custom Prompt */}
             <div>
@@ -277,7 +280,7 @@ const ContentGenerator = () => {
             {/* Generate Button */}
             <Button 
               onClick={handleGenerate}
-              disabled={!selectedTopic || isGenerating || !hasApiKey}
+              disabled={selectedTopics.length === 0 || isGenerating || !hasApiKey}
               className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
             >
               {isGenerating ? (
@@ -309,9 +312,11 @@ const ContentGenerator = () => {
                 <div className="bg-slate-50 rounded-lg p-4 border">
                   <div className="flex justify-between items-start mb-3">
                     <div className="flex gap-2">
-                      <Badge variant="outline" className="bg-white">
-                        {topics.find(t => t.id === selectedTopic)?.title}
-                      </Badge>
+                      {selectedTopics.length > 0 && (
+                        <Badge variant="outline" className="bg-white">
+                          {getSelectedTopicTitle()}
+                        </Badge>
+                      )}
                       <Badge variant="outline" className="bg-white capitalize">
                         {tone}
                       </Badge>
@@ -337,7 +342,7 @@ const ContentGenerator = () => {
                   </div>
                 </div>
 
-                <div className="flex gap-3">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   <Button 
                     variant="outline"
                     onClick={handleGenerate}
@@ -348,16 +353,25 @@ const ContentGenerator = () => {
                     Regenerate
                   </Button>
                   <Button 
-                    onClick={handleSchedule}
-                    disabled={isScheduling}
-                    className="flex-1 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700"
+                    onClick={handleSaveDraft}
+                    disabled={isSaving}
+                    variant="outline"
+                    className="flex-1"
                   >
-                    {isScheduling ? (
+                    {isSaving ? (
                       <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                     ) : (
-                      <Calendar className="h-4 w-4 mr-2" />
+                      <Save className="h-4 w-4 mr-2" />
                     )}
-                    Save as Draft
+                    Draft
+                  </Button>
+                  <Button 
+                    onClick={handlePublishToPostly}
+                    disabled={!generatedContent || !generatedPostId}
+                    className="flex-1 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700"
+                  >
+                    <Send className="h-4 w-4 mr-2" />
+                    Publish
                   </Button>
                 </div>
               </div>
@@ -365,12 +379,21 @@ const ContentGenerator = () => {
               <div className="text-center py-12">
                 <Brain className="h-12 w-12 text-slate-300 mx-auto mb-4" />
                 <p className="text-slate-500 mb-2">No content generated yet</p>
-                <p className="text-sm text-slate-400">Select a topic and click generate to create your first AI post</p>
+                <p className="text-sm text-slate-400">Select topics and click generate to create your first AI post</p>
               </div>
             )}
           </CardContent>
         </Card>
       </div>
+
+      {/* Post Scheduler Modal */}
+      <PostScheduler
+        isOpen={showScheduler}
+        onClose={() => setShowScheduler(false)}
+        content={generatedContent}
+        topicTitle={getSelectedTopicTitle()}
+        postId={generatedPostId}
+      />
     </div>
   );
 };
