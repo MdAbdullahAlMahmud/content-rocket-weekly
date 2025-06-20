@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -21,7 +20,8 @@ import {
   Loader2,
   Save,
   Send,
-  Zap
+  Zap,
+  Archive
 } from "lucide-react";
 import { usePosts } from "@/hooks/usePosts";
 import { useToast } from "@/hooks/use-toast";
@@ -44,7 +44,8 @@ const PostQueue = () => {
       case "posted": return "bg-green-100 text-green-800 border-green-200";
       case "scheduled": return "bg-blue-100 text-blue-800 border-blue-200";
       case "generated": return "bg-yellow-100 text-yellow-800 border-yellow-200";
-      case "draft": return "bg-purple-100 text-purple-800 border-purple-200";
+      case "backlog": return "bg-purple-100 text-purple-800 border-purple-200";
+      case "draft": return "bg-gray-100 text-gray-800 border-gray-200";
       case "failed": return "bg-red-100 text-red-800 border-red-200";
       default: return "bg-gray-100 text-gray-800 border-gray-200";
     }
@@ -55,6 +56,7 @@ const PostQueue = () => {
       case "posted": return <CheckCircle className="h-4 w-4" />;
       case "scheduled": return <Clock className="h-4 w-4" />;
       case "generated": return <RefreshCw className="h-4 w-4" />;
+      case "backlog": return <Archive className="h-4 w-4" />;
       case "draft": return <Edit className="h-4 w-4" />;
       case "failed": return <AlertCircle className="h-4 w-4" />;
       default: return <Clock className="h-4 w-4" />;
@@ -82,7 +84,11 @@ const PostQueue = () => {
     }
   };
 
-  const handleEditPost = (post: any) => {
+  const handleEditPost = (post: any, event?: React.MouseEvent) => {
+    if (event) {
+      event.stopPropagation();
+      event.preventDefault();
+    }
     setEditingPost(post.id);
     setEditContent(post.content);
   };
@@ -121,6 +127,22 @@ const PostQueue = () => {
     }
   };
 
+  const handleStatusChange = async (postId: string, newStatus: string) => {
+    try {
+      await updatePost(postId, { status: newStatus });
+      toast({
+        title: "Status updated",
+        description: `Post moved to ${newStatus}.`
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to update post status.",
+        variant: "destructive"
+      });
+    }
+  };
+
   const PostCard = ({ post }: { post: any }) => (
     <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300">
       <CardHeader className="pb-3">
@@ -153,6 +175,18 @@ const PostQueue = () => {
             </div>
           </div>
           <div className="flex gap-2 flex-wrap">
+            {/* Quick Status Actions */}
+            {(post.status === "generated" || post.status === "draft") && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => handleStatusChange(post.id, "backlog")}
+                className="text-purple-700 border-purple-300 hover:bg-purple-50"
+              >
+                <Archive className="h-4 w-4" />
+              </Button>
+            )}
+
             {/* Preview Dialog */}
             <Dialog>
               <DialogTrigger asChild>
@@ -160,7 +194,7 @@ const PostQueue = () => {
                   <Eye className="h-4 w-4" />
                 </Button>
               </DialogTrigger>
-              <DialogContent className="max-w-2xl">
+              <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
                 <DialogHeader>
                   <DialogTitle>Post Preview</DialogTitle>
                   <DialogDescription>
@@ -174,56 +208,58 @@ const PostQueue = () => {
             </Dialog>
 
             {/* Edit Dialog */}
-            {(post.status === "generated" || post.status === "draft") && (
+            {(post.status === "generated" || post.status === "draft" || post.status === "backlog") && (
               <Dialog>
                 <DialogTrigger asChild>
                   <Button 
                     size="sm" 
                     variant="outline" 
-                    onClick={() => handleEditPost(post)}
+                    onClick={(e) => handleEditPost(post, e)}
                   >
                     <Edit className="h-4 w-4" />
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="max-w-2xl">
+                <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col">
                   <DialogHeader>
                     <DialogTitle>Edit Post</DialogTitle>
                     <DialogDescription>
                       Make changes to your post content below.
                     </DialogDescription>
                   </DialogHeader>
-                  <div className="space-y-4">
+                  <div className="flex-1 space-y-4 overflow-y-auto">
                     <Textarea
                       value={editContent}
                       onChange={(e) => setEditContent(e.target.value)}
-                      rows={10}
-                      className="resize-none"
+                      rows={12}
+                      className="resize-none min-h-[300px]"
                     />
-                    <div className="flex gap-2 justify-end">
+                  </div>
+                  <div className="flex gap-2 justify-end pt-4 border-t">
+                    <DialogTrigger asChild>
                       <Button variant="outline" onClick={() => setEditingPost(null)}>
                         Cancel
                       </Button>
-                      <Button onClick={handleSaveEdit} disabled={isEditing}>
-                        {isEditing ? (
-                          <>
-                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                            Saving...
-                          </>
-                        ) : (
-                          <>
-                            <Save className="h-4 w-4 mr-2" />
-                            Save Changes
-                          </>
-                        )}
-                      </Button>
-                    </div>
+                    </DialogTrigger>
+                    <Button onClick={handleSaveEdit} disabled={isEditing}>
+                      {isEditing ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Saving...
+                        </>
+                      ) : (
+                        <>
+                          <Save className="h-4 w-4 mr-2" />
+                          Save Changes
+                        </>
+                      )}
+                    </Button>
                   </div>
                 </DialogContent>
               </Dialog>
             )}
 
             {/* Publishing Options */}
-            {(post.status === "generated" || post.status === "draft") && (
+            {(post.status === "generated" || post.status === "draft" || post.status === "backlog") && (
               <div className="flex gap-1">
                 <Button
                   size="sm"
@@ -335,7 +371,7 @@ const PostQueue = () => {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
         <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg">
           <CardContent className="p-4">
             <div className="flex items-center gap-2">
@@ -372,7 +408,18 @@ const PostQueue = () => {
         <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg">
           <CardContent className="p-4">
             <div className="flex items-center gap-2">
-              <Edit className="h-4 w-4 text-purple-500" />
+              <Archive className="h-4 w-4 text-purple-500" />
+              <span className="text-sm text-slate-600">Backlog</span>
+            </div>
+            <div className="text-2xl font-bold text-slate-900 mt-1">
+              {posts.filter(p => p.status === "backlog").length}
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2">
+              <Edit className="h-4 w-4 text-gray-500" />
               <span className="text-sm text-slate-600">Drafts</span>
             </div>
             <div className="text-2xl font-bold text-slate-900 mt-1">
@@ -404,8 +451,9 @@ const PostQueue = () => {
         </Card>
       ) : (
         <Tabs defaultValue="all" className="w-full">
-          <TabsList className="grid w-full grid-cols-6 bg-white/60 backdrop-blur-sm">
+          <TabsList className="grid w-full grid-cols-7 bg-white/60 backdrop-blur-sm">
             <TabsTrigger value="all" className="data-[state=active]:bg-white">All Posts</TabsTrigger>
+            <TabsTrigger value="backlog" className="data-[state=active]:bg-white">Backlog</TabsTrigger>
             <TabsTrigger value="draft" className="data-[state=active]:bg-white">Drafts</TabsTrigger>
             <TabsTrigger value="generated" className="data-[state=active]:bg-white">Generated</TabsTrigger>
             <TabsTrigger value="scheduled" className="data-[state=active]:bg-white">Scheduled</TabsTrigger>
@@ -413,7 +461,7 @@ const PostQueue = () => {
             <TabsTrigger value="failed" className="data-[state=active]:bg-white">Failed</TabsTrigger>
           </TabsList>
 
-          {["all", "draft", "generated", "scheduled", "posted", "failed"].map((status) => (
+          {["all", "backlog", "draft", "generated", "scheduled", "posted", "failed"].map((status) => (
             <TabsContent key={status} value={status} className="mt-6">
               <div className="grid gap-4">
                 {filterPostsByStatus(status).map((post) => (

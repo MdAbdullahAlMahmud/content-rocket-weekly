@@ -1,16 +1,22 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Textarea } from "@/components/ui/textarea";
-import { Zap, Send, CheckCircle, AlertCircle, Loader2, ExternalLink } from "lucide-react";
-import { useSettings } from "@/hooks/useSettings";
-import { usePosts } from "@/hooks/usePosts";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { 
+  Zap, 
+  Send, 
+  Loader2, 
+  AlertCircle,
+  ExternalLink,
+  CheckCircle
+} from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { usePosts } from "@/hooks/usePosts";
+import { useSettings } from "@/hooks/useSettings";
 
 interface ZapierPublisherProps {
   isOpen: boolean;
@@ -21,76 +27,79 @@ interface ZapierPublisherProps {
 }
 
 const ZapierPublisher = ({ isOpen, onClose, content, topicTitle, postId }: ZapierPublisherProps) => {
-  const [webhookUrl, setWebhookUrl] = useState("");
+  const [editedContent, setEditedContent] = useState(content);
   const [isPublishing, setIsPublishing] = useState(false);
-  const [publishStatus, setPublishStatus] = useState<'idle' | 'publishing' | 'success' | 'error'>('idle');
-  const [additionalData, setAdditionalData] = useState("");
+  const [publishedSuccessfully, setPublishedSuccessfully] = useState(false);
   
-  const { settings } = useSettings();
-  const { updatePost } = usePosts();
   const { toast } = useToast();
+  const { updatePost } = usePosts();
+  const { settings } = useSettings();
 
   const handlePublish = async () => {
-    if (!webhookUrl.trim()) {
+    if (!settings?.zapier_webhook_url) {
       toast({
-        title: "Webhook URL Required",
-        description: "Please enter your Zapier webhook URL.",
+        title: "Zapier Webhook Not Configured",
+        description: "Please configure your Zapier webhook URL in Settings first.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!editedContent.trim()) {
+      toast({
+        title: "Content Required",
+        description: "Please provide content to publish.",
         variant: "destructive"
       });
       return;
     }
 
     setIsPublishing(true);
-    setPublishStatus('publishing');
+    console.log("Publishing to Zapier:", settings.zapier_webhook_url);
 
     try {
-      const payload = {
-        content,
-        topicTitle,
-        postId,
-        timestamp: new Date().toISOString(),
-        additionalData: additionalData || null,
-        source: "LinkedIn AI Scheduler"
-      };
-
-      const response = await fetch(webhookUrl, {
+      // Send to Zapier webhook
+      const response = await fetch(settings.zapier_webhook_url, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        mode: "no-cors",
-        body: JSON.stringify(payload),
+        mode: "no-cors", // Handle CORS issues
+        body: JSON.stringify({
+          content: editedContent,
+          topic: topicTitle,
+          timestamp: new Date().toISOString(),
+          platform: "linkedin",
+          source: "linkedin-ai-scheduler"
+        }),
       });
 
-      // Update post status
+      // Update post status if we have a postId
       if (postId) {
-        await updatePost(postId, { 
-          status: 'posted',
+        await updatePost(postId, {
+          status: "posted",
+          content: editedContent,
           posted_at: new Date().toISOString()
         });
       }
 
-      setPublishStatus('success');
-      
+      setPublishedSuccessfully(true);
       toast({
-        title: "Published to Zapier!",
-        description: "Your post has been sent to Zapier. Check your Zap's history to confirm it was triggered."
+        title: "Published via Zapier!",
+        description: "Your post has been sent to Zapier. Check your Zap's history to confirm it was processed.",
       });
 
-      // Close dialog after a brief delay
+      // Auto-close after success
       setTimeout(() => {
         onClose();
-        setPublishStatus('idle');
-        setWebhookUrl("");
-        setAdditionalData("");
+        setPublishedSuccessfully(false);
       }, 2000);
 
-    } catch (error: any) {
-      console.error('Error publishing to Zapier:', error);
-      setPublishStatus('error');
+    } catch (error) {
+      console.error("Error publishing to Zapier:", error);
       toast({
         title: "Publishing Failed",
-        description: "Failed to send post to Zapier. Please check the webhook URL and try again.",
+        description: "Failed to send post to Zapier. Please check your webhook URL and try again.",
         variant: "destructive"
       });
     } finally {
@@ -98,177 +107,118 @@ const ZapierPublisher = ({ isOpen, onClose, content, topicTitle, postId }: Zapie
     }
   };
 
-  const isZapierConfigured = !!settings?.zapier_webhook_url;
+  const handleClose = () => {
+    if (!isPublishing) {
+      onClose();
+      setPublishedSuccessfully(false);
+    }
+  };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[600px]">
-        <DialogHeader>
+    <Dialog open={isOpen} onOpenChange={handleClose}>
+      <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
+        <DialogHeader className="flex-shrink-0">
           <DialogTitle className="flex items-center gap-2">
             <Zap className="h-5 w-5 text-orange-500" />
             Publish via Zapier
           </DialogTitle>
+          <DialogDescription>
+            Send your post to LinkedIn through your Zapier automation
+            {topicTitle && (
+              <Badge variant="outline" className="ml-2">
+                {topicTitle}
+              </Badge>
+            )}
+          </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-6">
-          {/* Connection Status */}
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className={`w-3 h-3 rounded-full ${isZapierConfigured ? 'bg-green-500' : 'bg-orange-500'}`} />
-                  <span className="font-medium">Zapier Webhook</span>
-                </div>
-                <Badge variant={isZapierConfigured ? "default" : "secondary"}>
-                  {isZapierConfigured ? 'Configured' : 'Manual Setup'}
-                </Badge>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Post Preview */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Post Preview</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="bg-slate-50 rounded-lg p-4 border">
-                {topicTitle && (
-                  <Badge variant="outline" className="mb-3">
-                    {topicTitle}
-                  </Badge>
-                )}
-                <div className="prose prose-sm max-w-none">
-                  <p className="text-slate-700 whitespace-pre-line">{content}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Webhook Configuration */}
-          {publishStatus === 'idle' && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Zapier Configuration</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <Label htmlFor="webhook" className="text-sm font-medium">
-                    Zapier Webhook URL *
-                  </Label>
-                  <Input
-                    id="webhook"
-                    type="url"
-                    placeholder="https://hooks.zapier.com/hooks/catch/..."
-                    value={webhookUrl || settings?.zapier_webhook_url || ""}
-                    onChange={(e) => setWebhookUrl(e.target.value)}
-                    className="mt-2"
-                  />
-                  <p className="text-xs text-slate-600 mt-1">
-                    Create a Zap with a "Catch Hook" trigger to get this URL
-                  </p>
-                </div>
-
-                <div>
-                  <Label htmlFor="additional" className="text-sm font-medium">
-                    Additional Data (Optional)
-                  </Label>
-                  <Textarea
-                    id="additional"
-                    placeholder="Any additional data you want to send to Zapier..."
-                    value={additionalData}
-                    onChange={(e) => setAdditionalData(e.target.value)}
-                    rows={3}
-                    className="mt-2"
-                  />
-                </div>
-
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                  <h4 className="font-medium text-blue-900 mb-2">Zapier Integration Help</h4>
-                  <ul className="text-sm text-blue-800 space-y-1">
-                    <li>• Create a new Zap in your Zapier account</li>
-                    <li>• Use "Webhooks by Zapier" as the trigger</li>
-                    <li>• Select "Catch Hook" and copy the webhook URL</li>
-                    <li>• Connect to LinkedIn, Twitter, or any other app as the action</li>
-                  </ul>
-                </div>
-
-                <Button
-                  onClick={handlePublish}
-                  disabled={!webhookUrl.trim() || isPublishing}
-                  className="w-full bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700"
-                >
-                  {isPublishing ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Publishing to Zapier...
-                    </>
-                  ) : (
-                    <>
-                      <Zap className="h-4 w-4 mr-2" />
-                      Publish via Zapier
-                    </>
-                  )}
-                </Button>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Status Messages */}
-          {publishStatus === 'publishing' && (
-            <Card>
-              <CardContent className="p-6 text-center">
-                <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-orange-500" />
-                <h3 className="font-medium text-slate-900 mb-2">
-                  Publishing to Zapier...
-                </h3>
-                <p className="text-sm text-slate-600">
-                  Sending your post data to the Zapier webhook...
-                </p>
-              </CardContent>
-            </Card>
-          )}
-
-          {publishStatus === 'success' && (
-            <Card>
-              <CardContent className="p-6 text-center">
-                <CheckCircle className="h-8 w-8 mx-auto mb-4 text-green-500" />
-                <h3 className="font-medium text-slate-900 mb-2">
-                  Published Successfully!
-                </h3>
-                <p className="text-sm text-slate-600 mb-4">
-                  Your post has been sent to Zapier. Check your Zap's history to see the trigger.
-                </p>
+        <div className="flex-1 space-y-4 overflow-y-auto min-h-0">
+          {!settings?.zapier_webhook_url ? (
+            <Alert>
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription className="flex items-center justify-between">
+                <span>Zapier webhook URL is not configured.</span>
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => window.open("https://zapier.com/app/history", '_blank')}
+                  onClick={() => window.open('https://zapier.com/apps/webhook/integrations', '_blank')}
                 >
                   <ExternalLink className="h-4 w-4 mr-2" />
-                  View Zap History
+                  Setup Zapier
                 </Button>
-              </CardContent>
-            </Card>
+              </AlertDescription>
+            </Alert>
+          ) : (
+            <Alert>
+              <CheckCircle className="h-4 w-4" />
+              <AlertDescription>
+                Zapier webhook is configured and ready to use.
+              </AlertDescription>
+            </Alert>
           )}
 
-          {publishStatus === 'error' && (
-            <Card>
-              <CardContent className="p-6 text-center">
-                <AlertCircle className="h-8 w-8 mx-auto mb-4 text-red-500" />
-                <h3 className="font-medium text-slate-900 mb-2">Publishing Failed</h3>
-                <p className="text-sm text-slate-600 mb-4">
-                  There was an error sending your post to Zapier. Please check your webhook URL and try again.
-                </p>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setPublishStatus('idle')}
-                >
-                  Try Again
-                </Button>
-              </CardContent>
-            </Card>
+          <div className="space-y-2">
+            <Label htmlFor="zapier-content">Post Content</Label>
+            <Textarea
+              id="zapier-content"
+              value={editedContent}
+              onChange={(e) => setEditedContent(e.target.value)}
+              rows={12}
+              className="resize-none min-h-[300px]"
+              placeholder="Your LinkedIn post content..."
+            />
+          </div>
+
+          <div className="bg-blue-50 rounded-lg p-4 text-sm text-blue-800">
+            <h4 className="font-medium mb-2">How Zapier Publishing Works:</h4>
+            <ul className="space-y-1 text-blue-700">
+              <li>• Your content will be sent to your configured Zapier webhook</li>
+              <li>• Your Zap should handle posting to LinkedIn automatically</li>
+              <li>• Check your Zap's history to confirm successful processing</li>
+              <li>• Make sure your Zap is enabled and properly configured</li>
+            </ul>
+          </div>
+
+          {publishedSuccessfully && (
+            <Alert className="bg-green-50 border-green-200">
+              <CheckCircle className="h-4 w-4 text-green-600" />
+              <AlertDescription className="text-green-800">
+                Successfully sent to Zapier! Check your Zap's history for confirmation.
+              </AlertDescription>
+            </Alert>
           )}
+        </div>
+
+        <div className="flex gap-3 justify-end pt-4 border-t flex-shrink-0">
+          <Button 
+            variant="outline" 
+            onClick={handleClose}
+            disabled={isPublishing}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handlePublish}
+            disabled={isPublishing || !settings?.zapier_webhook_url || publishedSuccessfully}
+            className="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700"
+          >
+            {isPublishing ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Publishing...
+              </>
+            ) : publishedSuccessfully ? (
+              <>
+                <CheckCircle className="h-4 w-4 mr-2" />
+                Published!
+              </>
+            ) : (
+              <>
+                <Zap className="h-4 w-4 mr-2" />
+                Publish to Zapier
+              </>
+            )}
+          </Button>
         </div>
       </DialogContent>
     </Dialog>
