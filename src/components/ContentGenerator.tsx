@@ -5,24 +5,18 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { 
   Brain, 
   Wand2, 
   Save, 
-  Send,
-  Clock,
   Archive,
-  Zap,
   Loader2,
-  AlertCircle
+  RefreshCw
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { usePosts } from "@/hooks/usePosts";
 import { useTopics } from "@/hooks/useTopics";
 import TopicSelectionModal from "./TopicSelectionModal";
-import PostScheduler from "./PostScheduler";
-import ZapierPublisher from "./ZapierPublisher";
 
 const ContentGenerator = () => {
   const [selectedTopics, setSelectedTopics] = useState<any[]>([]);
@@ -30,9 +24,6 @@ const ContentGenerator = () => {
   const [generatedContent, setGeneratedContent] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [showTopicModal, setShowTopicModal] = useState(false);
-  const [showPostScheduler, setShowPostScheduler] = useState(false);
-  const [showZapierPublisher, setShowZapierPublisher] = useState(false);
-  const [selectedPlatform, setSelectedPlatform] = useState<string>("");
   
   const { toast } = useToast();
   const { addPost } = usePosts();
@@ -86,7 +77,11 @@ What's your experience with ${topicTitles}? I'd love to hear your thoughts!
     }
   };
 
-  const handleSaveAction = async (status: 'draft' | 'backlog' | 'generated') => {
+  const handleRegenerate = () => {
+    handleGenerate();
+  };
+
+  const handleSaveAction = async (status: 'draft' | 'backlog') => {
     if (!generatedContent.trim()) {
       toast({
         title: "No Content",
@@ -108,8 +103,7 @@ What's your experience with ${topicTitles}? I'd love to hear your thoughts!
 
       const statusMessages = {
         draft: "Content saved as draft",
-        backlog: "Content added to backlog",
-        generated: "Content saved as generated"
+        backlog: "Content saved to backlog"
       };
 
       toast({
@@ -127,24 +121,6 @@ What's your experience with ${topicTitles}? I'd love to hear your thoughts!
         description: "Failed to save content. Please try again.",
         variant: "destructive"
       });
-    }
-  };
-
-  const handlePublishClick = (platform: string) => {
-    if (!generatedContent.trim()) {
-      toast({
-        title: "No Content",
-        description: "Please generate content first.",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    setSelectedPlatform(platform);
-    if (platform === "postly") {
-      setShowPostScheduler(true);
-    } else if (platform === "zapier") {
-      setShowZapierPublisher(true);
     }
   };
 
@@ -258,8 +234,17 @@ What's your experience with ${topicTitles}? I'd love to hear your thoughts!
             </div>
 
             {/* Action Buttons */}
-            <div className="flex flex-wrap gap-3">
-              {/* Save Actions */}
+            <div className="flex flex-wrap gap-3 justify-between">
+              <Button
+                onClick={handleRegenerate}
+                variant="outline"
+                size="sm"
+                className="text-purple-700 border-purple-300 hover:bg-purple-50"
+              >
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Regenerate
+              </Button>
+              
               <div className="flex gap-2">
                 <Button
                   onClick={() => handleSaveAction('draft')}
@@ -272,33 +257,11 @@ What's your experience with ${topicTitles}? I'd love to hear your thoughts!
                 </Button>
                 <Button
                   onClick={() => handleSaveAction('backlog')}
-                  variant="outline"
                   size="sm"
-                  className="text-purple-700 border-purple-300 hover:bg-purple-50"
+                  className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
                 >
                   <Archive className="h-4 w-4 mr-2" />
-                  Backlog
-                </Button>
-              </div>
-
-              {/* Publish Actions */}
-              <div className="flex gap-2">
-                <Button
-                  onClick={() => handlePublishClick('postly')}
-                  size="sm"
-                  className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
-                >
-                  <Send className="h-4 w-4 mr-2" />
-                  Postly
-                </Button>
-                <Button
-                  onClick={() => handlePublishClick('zapier')}
-                  size="sm"
-                  variant="outline"
-                  className="border-orange-300 text-orange-700 hover:bg-orange-50"
-                >
-                  <Zap className="h-4 w-4 mr-2" />
-                  Zapier
+                  Save to Backlog
                 </Button>
               </div>
             </div>
@@ -306,37 +269,13 @@ What's your experience with ${topicTitles}? I'd love to hear your thoughts!
         </Card>
       )}
 
-      {/* Modals */}
+      {/* Topic Selection Modal */}
       <TopicSelectionModal
         isOpen={showTopicModal}
         onClose={() => setShowTopicModal(false)}
         selectedTopics={selectedTopics}
         onTopicsChange={setSelectedTopics}
       />
-
-      {generatedContent && (
-        <>
-          <PostScheduler
-            isOpen={showPostScheduler}
-            onClose={() => {
-              setShowPostScheduler(false);
-              setSelectedPlatform("");
-            }}
-            content={generatedContent}
-            topicTitle={selectedTopics.length > 0 ? selectedTopics[0].title : undefined}
-          />
-          
-          <ZapierPublisher
-            isOpen={showZapierPublisher}
-            onClose={() => {
-              setShowZapierPublisher(false);
-              setSelectedPlatform("");
-            }}
-            content={generatedContent}
-            topicTitle={selectedTopics.length > 0 ? selectedTopics[0].title : undefined}
-          />
-        </>
-      )}
     </div>
   );
 };

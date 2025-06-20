@@ -9,7 +9,7 @@ export interface Post {
   topic_id?: string;
   title?: string;
   content: string;
-  status: 'generated' | 'scheduled' | 'posted' | 'failed' | 'draft';
+  status: 'generated' | 'scheduled' | 'posted' | 'failed' | 'draft' | 'backlog';
   scheduled_date?: string;
   scheduled_time?: string;
   posted_at?: string;
