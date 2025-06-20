@@ -1,4 +1,3 @@
-
 import { useState, useMemo } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -23,8 +22,8 @@ import { useToast } from "@/hooks/use-toast";
 interface TopicSelectionModalProps {
   isOpen: boolean;
   onClose: () => void;
-  selectedTopics: string[];
-  onTopicsChange: (topicIds: string[]) => void;
+  selectedTopics: any[];
+  onTopicsChange: (topics: any[]) => void;
 }
 
 const TopicSelectionModal = ({ isOpen, onClose, selectedTopics, onTopicsChange }: TopicSelectionModalProps) => {
@@ -32,7 +31,7 @@ const TopicSelectionModal = ({ isOpen, onClose, selectedTopics, onTopicsChange }
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [bulkTopics, setBulkTopics] = useState("");
   const [showBulkAdd, setShowBulkAdd] = useState(false);
-  const [tempSelected, setTempSelected] = useState<string[]>(selectedTopics);
+  const [tempSelected, setTempSelected] = useState<string[]>(selectedTopics.map(t => t.id));
   
   const { topics, addTopic } = useTopics();
   const { toast } = useToast();
@@ -111,11 +110,13 @@ const TopicSelectionModal = ({ isOpen, onClose, selectedTopics, onTopicsChange }
   };
 
   const handleApply = () => {
-    onTopicsChange(tempSelected);
+    const selectedTopicObjects = topics.filter(topic => tempSelected.includes(topic.id));
+    onTopicsChange(selectedTopicObjects);
+    onClose();
   };
 
   const handleCancel = () => {
-    setTempSelected(selectedTopics);
+    setTempSelected(selectedTopics.map(t => t.id));
     onClose();
   };
 
