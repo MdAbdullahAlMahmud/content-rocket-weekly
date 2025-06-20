@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -27,6 +28,8 @@ import { usePosts } from "@/hooks/usePosts";
 import { useToast } from "@/hooks/use-toast";
 import PostScheduler from "./PostScheduler";
 import ZapierPublisher from "./ZapierPublisher";
+
+type PostStatus = 'generated' | 'draft' | 'backlog' | 'scheduled' | 'posted' | 'failed';
 
 const PostQueue = () => {
   const { posts, loading, deletePost, updatePost } = usePosts();
@@ -127,7 +130,7 @@ const PostQueue = () => {
     }
   };
 
-  const handleStatusChange = async (postId: string, newStatus: string) => {
+  const handleStatusChange = async (postId: string, newStatus: PostStatus) => {
     try {
       await updatePost(postId, { status: newStatus });
       toast({
@@ -258,8 +261,8 @@ const PostQueue = () => {
               </Dialog>
             )}
 
-            {/* Publishing Options */}
-            {(post.status === "generated" || post.status === "draft" || post.status === "backlog") && (
+            {/* Publishing Options - Only for Backlog posts */}
+            {post.status === "backlog" && (
               <div className="flex gap-1">
                 <Button
                   size="sm"
