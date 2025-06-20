@@ -13,7 +13,8 @@ import {
   Eye, 
   EyeOff,
   ExternalLink,
-  AlertCircle
+  AlertCircle,
+  Zap
 } from "lucide-react";
 import { useSettings } from "@/hooks/useSettings";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -22,6 +23,7 @@ const Settings = () => {
   const { settings, loading, updateSettings } = useSettings();
   const [openaiKey, setOpenaiKey] = useState("");
   const [postlyKey, setPostlyKey] = useState("");
+  const [zapierWebhookUrl, setZapierWebhookUrl] = useState("");
   const [showOpenaiKey, setShowOpenaiKey] = useState(false);
   const [showPostlyKey, setShowPostlyKey] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -38,10 +40,15 @@ const Settings = () => {
       updates.postly_api_key = postlyKey.trim();
     }
 
+    if (zapierWebhookUrl.trim()) {
+      updates.zapier_webhook_url = zapierWebhookUrl.trim();
+    }
+
     if (Object.keys(updates).length > 0) {
       await updateSettings(updates);
       setOpenaiKey("");
       setPostlyKey("");
+      setZapierWebhookUrl("");
     }
     setSaving(false);
   };
@@ -150,9 +157,38 @@ const Settings = () => {
             </p>
           </div>
 
+          <Separator />
+
+          {/* Zapier Webhook URL */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <Label htmlFor="zapier-webhook" className="text-sm font-medium text-slate-700">
+                Zapier Webhook URL
+              </Label>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => window.open('https://zapier.com/apps/webhook/integrations', '_blank')}
+              >
+                <ExternalLink className="h-4 w-4 mr-2" />
+                Setup Webhook
+              </Button>
+            </div>
+            <Input
+              id="zapier-webhook"
+              type="url"
+              placeholder={settings?.zapier_webhook_url ? "••••••••••••••••" : "https://hooks.zapier.com/hooks/catch/..."}
+              value={zapierWebhookUrl}
+              onChange={(e) => setZapierWebhookUrl(e.target.value)}
+            />
+            <p className="text-xs text-slate-500">
+              Used for triggering Zapier workflows. Create a Zap with a "Catch Hook" trigger to get this URL.
+            </p>
+          </div>
+
           <Button 
             onClick={handleSave}
-            disabled={saving || (!openaiKey.trim() && !postlyKey.trim())}
+            disabled={saving || (!openaiKey.trim() && !postlyKey.trim() && !zapierWebhookUrl.trim())}
             className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
           >
             {saving ? (
@@ -193,6 +229,15 @@ const Settings = () => {
               </div>
               <span className={`text-sm ${settings?.postly_api_key ? 'text-green-600' : 'text-red-600'}`}>
                 {settings?.postly_api_key ? 'Connected' : 'Not Connected'}
+              </span>
+            </div>
+            <div className="flex items-center justify-between p-3 rounded-lg bg-slate-50">
+              <div className="flex items-center gap-3">
+                <div className={`w-3 h-3 rounded-full ${settings?.zapier_webhook_url ? 'bg-green-500' : 'bg-red-500'}`} />
+                <span className="font-medium">Zapier</span>
+              </div>
+              <span className={`text-sm ${settings?.zapier_webhook_url ? 'text-green-600' : 'text-red-600'}`}>
+                {settings?.zapier_webhook_url ? 'Connected' : 'Not Connected'}
               </span>
             </div>
           </div>

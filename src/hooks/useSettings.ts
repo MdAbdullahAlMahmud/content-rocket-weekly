@@ -9,6 +9,7 @@ export interface UserSettings {
   user_id: string;
   openai_api_key?: string;
   postly_api_key?: string;
+  zapier_webhook_url?: string;
   created_at: string;
   updated_at: string;
 }
@@ -39,7 +40,7 @@ export const useSettings = () => {
     }
   };
 
-  const updateSettings = async (updates: Partial<Pick<UserSettings, 'openai_api_key' | 'postly_api_key'>>) => {
+  const updateSettings = async (updates: Partial<Pick<UserSettings, 'openai_api_key' | 'postly_api_key' | 'zapier_webhook_url'>>) => {
     if (!user) return;
 
     try {
