@@ -7,6 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { 
   Calendar, 
   Clock, 
@@ -18,10 +19,14 @@ import {
   ExternalLink,
   RefreshCw,
   Loader2,
-  Save
+  Save,
+  Send,
+  Zap
 } from "lucide-react";
 import { usePosts } from "@/hooks/usePosts";
 import { useToast } from "@/hooks/use-toast";
+import PostScheduler from "./PostScheduler";
+import ZapierPublisher from "./ZapierPublisher";
 
 const PostQueue = () => {
   const { posts, loading, deletePost, updatePost } = usePosts();
@@ -29,6 +34,10 @@ const PostQueue = () => {
   const [editingPost, setEditingPost] = useState<string | null>(null);
   const [editContent, setEditContent] = useState("");
   const [isEditing, setIsEditing] = useState(false);
+  const [showScheduler, setShowScheduler] = useState(false);
+  const [showZapierPublisher, setShowZapierPublisher] = useState(false);
+  const [selectedPost, setSelectedPost] = useState<any>(null);
+  const [publishingPlatform, setPublishingPlatform] = useState<string>("");
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -101,12 +110,23 @@ const PostQueue = () => {
     }
   };
 
+  const handlePublish = (post: any, platform: string) => {
+    setSelectedPost(post);
+    setPublishingPlatform(platform);
+    
+    if (platform === "postly") {
+      setShowScheduler(true);
+    } else if (platform === "zapier") {
+      setShowZapierPublisher(true);
+    }
+  };
+
   const PostCard = ({ post }: { post: any }) => (
     <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300">
       <CardHeader className="pb-3">
         <div className="flex justify-between items-start">
           <div className="flex-1">
-            <div className="flex items-center gap-2 mb-2">
+            <div className="flex items-center gap-2 mb-2 flex-wrap">
               <Badge className={getStatusColor(post.status)}>
                 {getStatusIcon(post.status)}
                 <span className="ml-1 capitalize">{post.status}</span>
@@ -117,7 +137,7 @@ const PostQueue = () => {
                 </Badge>
               )}
             </div>
-            <div className="flex items-center gap-4 text-sm text-slate-600">
+            <div className="flex items-center gap-4 text-sm text-slate-600 flex-wrap">
               {post.scheduled_date && (
                 <span className="flex items-center gap-1">
                   <Calendar className="h-4 w-4" />
@@ -132,7 +152,7 @@ const PostQueue = () => {
               )}
             </div>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
             {/* Preview Dialog */}
             <Dialog>
               <DialogTrigger asChild>
@@ -157,7 +177,11 @@ const PostQueue = () => {
             {(post.status === "generated" || post.status === "draft") && (
               <Dialog>
                 <DialogTrigger asChild>
-                  <Button size="sm" variant="outline" onClick={() => handleEditPost(post)}>
+                  <Button 
+                    size="sm" 
+                    variant="outline" 
+                    onClick={() => handleEditPost(post)}
+                  >
                     <Edit className="h-4 w-4" />
                   </Button>
                 </DialogTrigger>
@@ -196,6 +220,29 @@ const PostQueue = () => {
                   </div>
                 </DialogContent>
               </Dialog>
+            )}
+
+            {/* Publishing Options */}
+            {(post.status === "generated" || post.status === "draft") && (
+              <div className="flex gap-1">
+                <Button
+                  size="sm"
+                  onClick={() => handlePublish(post, "postly")}
+                  className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+                >
+                  <Send className="h-4 w-4 mr-1" />
+                  Postly
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handlePublish(post, "zapier")}
+                  className="border-orange-300 text-orange-700 hover:bg-orange-50"
+                >
+                  <Zap className="h-4 w-4 mr-1" />
+                  Zapier
+                </Button>
+              </div>
             )}
 
             {/* External Link */}
@@ -376,6 +423,33 @@ const PostQueue = () => {
             </TabsContent>
           ))}
         </Tabs>
+      )}
+
+      {/* Modals */}
+      {selectedPost && (
+        <>
+          <PostScheduler
+            isOpen={showScheduler}
+            onClose={() => {
+              setShowScheduler(false);
+              setSelectedPost(null);
+            }}
+            content={selectedPost.content}
+            topicTitle={selectedPost.topics?.title}
+            postId={selectedPost.id}
+          />
+          
+          <ZapierPublisher
+            isOpen={showZapierPublisher}
+            onClose={() => {
+              setShowZapierPublisher(false);
+              setSelectedPost(null);
+            }}
+            content={selectedPost.content}
+            topicTitle={selectedPost.topics?.title}
+            postId={selectedPost.id}
+          />
+        </>
       )}
     </div>
   );

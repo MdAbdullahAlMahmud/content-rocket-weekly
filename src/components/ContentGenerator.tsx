@@ -15,7 +15,8 @@ import {
   Send,
   Sparkles,
   AlertCircle,
-  Loader2
+  Loader2,
+  Plus
 } from "lucide-react";
 import { useTopics } from "@/hooks/useTopics";
 import { useSettings } from "@/hooks/useSettings";
@@ -25,6 +26,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { supabase } from "@/integrations/supabase/client";
 import TopicSelector from "./TopicSelector";
 import PostScheduler from "./PostScheduler";
+import TopicSelectionModal from "./TopicSelectionModal";
 
 const ContentGenerator = () => {
   const [selectedTopics, setSelectedTopics] = useState<string[]>([]);
@@ -38,6 +40,7 @@ const ContentGenerator = () => {
   const [isCopied, setIsCopied] = useState(false);
   const [generationStatus, setGenerationStatus] = useState("");
   const [showScheduler, setShowScheduler] = useState(false);
+  const [showTopicModal, setShowTopicModal] = useState(false);
   
   const { topics } = useTopics();
   const { settings } = useSettings();
@@ -72,7 +75,7 @@ const ContentGenerator = () => {
       toast({
         title: "Topic Required",
         description: "Please select at least one topic to generate content.",
-        variant: "descriptive"
+        variant: "destructive"
       });
       return;
     }
@@ -87,7 +90,7 @@ const ContentGenerator = () => {
       
       const { data, error } = await supabase.functions.invoke('generate-content', {
         body: { 
-          topicId: selectedTopics[0], // Use first selected topic
+          topicId: selectedTopics[0],
           topicTitle: selectedTopicData?.title,
           topicDescription: selectedTopicData?.description,
           tone,
@@ -150,7 +153,6 @@ const ContentGenerator = () => {
         description: "Your generated content has been saved as a draft."
       });
       
-      // Clear the form
       setGeneratedContent("");
       setGeneratedPostId(null);
       setSelectedTopics([]);
@@ -185,6 +187,22 @@ const ContentGenerator = () => {
     return topic?.title || "";
   };
 
+  const getSelectedTopicTitles = () => {
+    return selectedTopics.map(id => {
+      const topic = topics.find(t => t.id === id);
+      return topic?.title || "";
+    }).filter(Boolean);
+  };
+
+  const handleTopicSelection = (topicIds: string[]) => {
+    setSelectedTopics(topicIds);
+    setShowTopicModal(false);
+  };
+
+  const removeSelectedTopic = (topicId: string) => {
+    setSelectedTopics(prev => prev.filter(id => id !== topicId));
+  };
+
   const hasApiKey = !!settings?.openai_api_key;
 
   return (
@@ -217,10 +235,39 @@ const ContentGenerator = () => {
           </CardHeader>
           <CardContent className="space-y-6">
             {/* Topic Selection */}
-            <TopicSelector
-              selectedTopics={selectedTopics}
-              onTopicsChange={setSelectedTopics}
-            />
+            <div>
+              <Label className="text-sm font-medium text-slate-700 mb-3 block">
+                Selected Topics ({selectedTopics.length})
+              </Label>
+              
+              <div className="space-y-3">
+                {/* Selected Topics Display */}
+                {selectedTopics.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {getSelectedTopicTitles().map((title, index) => (
+                      <Badge 
+                        key={selectedTopics[index]} 
+                        variant="secondary" 
+                        className="bg-blue-100 text-blue-800 border-blue-200 cursor-pointer hover:bg-red-100 hover:text-red-800 hover:border-red-200 transition-colors"
+                        onClick={() => removeSelectedTopic(selectedTopics[index])}
+                      >
+                        {title} ×
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+                
+                {/* Topic Selection Button */}
+                <Button
+                  variant="outline"
+                  onClick={() => setShowTopicModal(true)}
+                  className="w-full justify-center"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  {selectedTopics.length === 0 ? "Select Topics" : "Add More Topics"}
+                </Button>
+              </div>
+            </div>
 
             {/* Custom Prompt */}
             <div>
@@ -311,12 +358,12 @@ const ContentGenerator = () => {
               <div className="space-y-4">
                 <div className="bg-slate-50 rounded-lg p-4 border">
                   <div className="flex justify-between items-start mb-3">
-                    <div className="flex gap-2">
-                      {selectedTopics.length > 0 && (
-                        <Badge variant="outline" className="bg-white">
-                          {getSelectedTopicTitle()}
+                    <div className="flex gap-2 flex-wrap">
+                      {getSelectedTopicTitles().map((title, index) => (
+                        <Badge key={index} variant="outline" className="bg-white">
+                          {title}
                         </Badge>
-                      )}
+                      ))}
                       <Badge variant="outline" className="bg-white capitalize">
                         {tone}
                       </Badge>
@@ -385,6 +432,14 @@ const ContentGenerator = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Topic Selection Modal */}
+      <TopicSelectionModal
+        isOpen={showTopicModal}
+        onClose={() => setShowTopicModal(false)}
+        selectedTopics={selectedTopics}
+        onTopicsChange={handleTopicSelection}
+      />
 
       {/* Post Scheduler Modal */}
       <PostScheduler
