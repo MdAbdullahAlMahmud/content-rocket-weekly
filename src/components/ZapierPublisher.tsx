@@ -16,11 +16,14 @@ import {
   ExternalLink,
   CheckCircle,
   Calendar,
-  Clock
+  Clock,
+  AlertTriangle
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { usePosts } from "@/hooks/usePosts";
 import { useSettings } from "@/hooks/useSettings";
+import { useZapierUsage } from "@/hooks/useZapierUsage";
+import { supabase } from "@/integrations/supabase/client";
 
 interface ZapierPublisherProps {
   isOpen: boolean;
@@ -41,6 +44,7 @@ const ZapierPublisher = ({ isOpen, onClose, content, topicTitle, postId }: Zapie
   const { toast } = useToast();
   const { updatePost } = usePosts();
   const { settings } = useSettings();
+  const { usage, canUseZapier, getRemainingUsage, incrementUsage } = useZapierUsage();
 
   const handlePublish = async () => {
     if (!settings?.zapier_webhook_url) {
@@ -61,6 +65,15 @@ const ZapierPublisher = ({ isOpen, onClose, content, topicTitle, postId }: Zapie
       return;
     }
 
+    if (!canUseZapier()) {
+      toast({
+        title: "Usage Limit Exceeded",
+        description: "You've reached your monthly limit of 100 Zapier actions. It will reset next month.",
+        variant: "destructive"
+      });
+      return;
+    }
+
     if (isScheduled && (!scheduledDate || !scheduledTime)) {
       toast({
         title: "Schedule Required",
@@ -74,66 +87,87 @@ const ZapierPublisher = ({ isOpen, onClose, content, topicTitle, postId }: Zapie
     console.log("Publishing to Zapier:", settings.zapier_webhook_url);
 
     try {
-      const publishData = {
-        content: editedContent,
-        topic: topicTitle,
-        timestamp: new Date().toISOString(),
-        platform: "linkedin",
-        source: "linkedin-ai-scheduler",
-        ...(isScheduled && {
-          scheduled: true,
-          scheduledDate,
-          scheduledTime,
-          scheduledTimestamp: new Date(`${scheduledDate}T${scheduledTime}`).toISOString()
-        })
-      };
+      if (isScheduled) {
+        // Schedule the post
+        const scheduledDateTime = new Date(`${scheduledDate}T${scheduledTime}`);
+        
+        const { error: scheduleError } = await supabase
+          .from('scheduled_posts')
+          .insert({
+            post_id: postId,
+            scheduled_for: scheduledDateTime.toISOString(),
+            zapier_webhook_url: settings.zapier_webhook_url,
+            post_content: editedContent,
+            topic_title: topicTitle,
+            status: 'pending'
+          });
 
-      // Send to Zapier webhook
-      const response = await fetch(settings.zapier_webhook_url, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        mode: "no-cors",
-        body: JSON.stringify(publishData),
-      });
+        if (scheduleError) throw scheduleError;
 
-      // Update post status
-      if (postId) {
-        const updateData: any = {
-          content: editedContent,
-        };
-
-        if (isScheduled) {
-          updateData.status = "scheduled";
-          updateData.scheduled_date = scheduledDate;
-          updateData.scheduled_time = scheduledTime;
-        } else {
-          updateData.status = "posted";
-          updateData.posted_at = new Date().toISOString();
+        // Update post status
+        if (postId) {
+          await updatePost(postId, {
+            content: editedContent,
+            status: "scheduled",
+            scheduled_date: scheduledDate,
+            scheduled_time: scheduledTime
+          });
         }
 
-        await updatePost(postId, updateData);
-      }
+        setPublishedSuccessfully(true);
+        toast({
+          title: "Post Scheduled!",
+          description: `Your post has been scheduled for ${scheduledDate} at ${scheduledTime}. It will be automatically sent to Zapier at that time.`,
+        });
+      } else {
+        // Publish immediately
+        const publishData = {
+          content: editedContent,
+          topic: topicTitle,
+          timestamp: new Date().toISOString(),
+          platform: "linkedin",
+          source: "linkedin-ai-scheduler"
+        };
 
-      setPublishedSuccessfully(true);
-      toast({
-        title: isScheduled ? "Scheduled via Zapier!" : "Published via Zapier!",
-        description: isScheduled 
-          ? `Your post has been scheduled for ${scheduledDate} at ${scheduledTime}. Check your Zap's history to confirm.`
-          : "Your post has been sent to Zapier. Check your Zap's history to confirm it was processed.",
-      });
+        // Send to Zapier webhook
+        const response = await fetch(settings.zapier_webhook_url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          mode: "no-cors",
+          body: JSON.stringify(publishData),
+        });
+
+        // Increment usage count
+        await incrementUsage();
+
+        // Update post status
+        if (postId) {
+          await updatePost(postId, {
+            content: editedContent,
+            status: "posted",
+            posted_at: new Date().toISOString()
+          });
+        }
+
+        setPublishedSuccessfully(true);
+        toast({
+          title: "Published via Zapier!",
+          description: "Your post has been sent to Zapier. Check your Zap's history to confirm it was processed.",
+        });
+      }
 
       setTimeout(() => {
         onClose();
         setPublishedSuccessfully(false);
       }, 2000);
 
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error publishing to Zapier:", error);
       toast({
         title: "Publishing Failed",
-        description: "Failed to send post to Zapier. Please check your webhook URL and try again.",
+        description: error.message || "Failed to send post to Zapier. Please check your webhook URL and try again.",
         variant: "destructive"
       });
     } finally {
@@ -186,6 +220,7 @@ const ZapierPublisher = ({ isOpen, onClose, content, topicTitle, postId }: Zapie
         </DialogHeader>
 
         <div className="flex-1 space-y-4 overflow-y-auto min-h-0">
+          {/* Zapier Connection Status */}
           {!settings?.zapier_webhook_url ? (
             <Alert>
               <AlertCircle className="h-4 w-4" />
@@ -206,6 +241,28 @@ const ZapierPublisher = ({ isOpen, onClose, content, topicTitle, postId }: Zapie
               <CheckCircle className="h-4 w-4" />
               <AlertDescription>
                 Zapier webhook is configured and ready to use.
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {/* Usage Limit Alert */}
+          {usage && (
+            <Alert className={!canUseZapier() ? "border-red-200 bg-red-50" : getRemainingUsage() <= 10 ? "border-yellow-200 bg-yellow-50" : ""}>
+              <AlertTriangle className="h-4 w-4" />
+              <AlertDescription>
+                <div className="flex items-center justify-between">
+                  <span>
+                    Zapier Usage: {usage.usage_count}/{usage.limit_count} this month
+                  </span>
+                  <Badge variant={!canUseZapier() ? "destructive" : getRemainingUsage() <= 10 ? "secondary" : "default"}>
+                    {getRemainingUsage()} remaining
+                  </Badge>
+                </div>
+                {!canUseZapier() && (
+                  <p className="text-sm text-red-700 mt-1">
+                    You've reached your monthly limit. Resets on the 1st of next month.
+                  </p>
+                )}
               </AlertDescription>
             </Alert>
           )}
@@ -251,6 +308,14 @@ const ZapierPublisher = ({ isOpen, onClose, content, topicTitle, postId }: Zapie
                   onChange={(e) => setScheduledTime(e.target.value)}
                 />
               </div>
+              {isScheduled && scheduledDate && scheduledTime && (
+                <div className="col-span-2 p-3 bg-blue-100 rounded-lg">
+                  <p className="text-sm text-blue-800">
+                    <Clock className="h-4 w-4 inline mr-1" />
+                    Scheduled for: {new Date(`${scheduledDate}T${scheduledTime}`).toLocaleString()}
+                  </p>
+                </div>
+              )}
             </div>
           )}
 
@@ -271,9 +336,10 @@ const ZapierPublisher = ({ isOpen, onClose, content, topicTitle, postId }: Zapie
             <ul className="space-y-1 text-blue-700">
               <li>• Your content will be sent to your configured Zapier webhook</li>
               <li>• Your Zap should handle posting to LinkedIn automatically</li>
-              {isScheduled && <li>• Scheduled posts will include timestamp data for your Zap to process</li>}
+              {isScheduled && <li>• Scheduled posts will be automatically sent at the specified time</li>}
               <li>• Check your Zap's history to confirm successful processing</li>
               <li>• Make sure your Zap is enabled and properly configured</li>
+              <li>• Free plan includes 100 Zapier actions per month</li>
             </ul>
           </div>
 
@@ -281,7 +347,10 @@ const ZapierPublisher = ({ isOpen, onClose, content, topicTitle, postId }: Zapie
             <Alert className="bg-green-50 border-green-200">
               <CheckCircle className="h-4 w-4 text-green-600" />
               <AlertDescription className="text-green-800">
-                Successfully sent to Zapier! Check your Zap's history for confirmation.
+                {isScheduled 
+                  ? "Successfully scheduled! Your post will be sent automatically at the specified time."
+                  : "Successfully sent to Zapier! Check your Zap's history for confirmation."
+                }
               </AlertDescription>
             </Alert>
           )}
@@ -297,7 +366,7 @@ const ZapierPublisher = ({ isOpen, onClose, content, topicTitle, postId }: Zapie
           </Button>
           <Button
             onClick={handlePublish}
-            disabled={isPublishing || !settings?.zapier_webhook_url || publishedSuccessfully}
+            disabled={isPublishing || !settings?.zapier_webhook_url || publishedSuccessfully || !canUseZapier()}
             className="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700"
           >
             {isPublishing ? (

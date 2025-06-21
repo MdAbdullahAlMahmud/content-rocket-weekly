@@ -15,7 +15,18 @@ serve(async (req) => {
   }
 
   try {
-    const { topicId, topicTitle, topicDescription, tone, length, customPrompt, userContext } = await req.json();
+    const requestBody = await req.text();
+    console.log('Raw request body:', requestBody);
+    
+    let parsedBody;
+    try {
+      parsedBody = JSON.parse(requestBody);
+    } catch (parseError) {
+      console.error('JSON parsing error:', parseError);
+      throw new Error('Invalid JSON in request body');
+    }
+
+    const { topicId, topicTitle, topicDescription, tone, length, customPrompt, userContext } = parsedBody;
     
     // Get user from request
     const authHeader = req.headers.get('Authorization');
@@ -57,7 +68,7 @@ serve(async (req) => {
     let userPrompt = '';
     
     // If custom prompt is provided, use it as the primary instruction
-    if (customPrompt) {
+    if (customPrompt && customPrompt.trim()) {
       userPrompt = customPrompt;
       
       // Add topic context if available
@@ -108,9 +119,9 @@ serve(async (req) => {
     });
 
     if (!response.ok) {
-      const errorData = await response.json();
-      console.error('OpenAI API error:', errorData);
-      throw new Error(errorData.error?.message || 'Failed to generate content');
+      const errorText = await response.text();
+      console.error('OpenAI API error:', errorText);
+      throw new Error(`OpenAI API error: ${response.status} - ${errorText}`);
     }
 
     const data = await response.json();

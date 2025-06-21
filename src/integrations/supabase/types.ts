@@ -104,6 +104,53 @@ export type Database = {
         }
         Relationships: []
       }
+      scheduled_posts: {
+        Row: {
+          created_at: string
+          id: string
+          post_content: string
+          post_id: string | null
+          scheduled_for: string
+          status: string
+          topic_title: string | null
+          updated_at: string
+          user_id: string
+          zapier_webhook_url: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          post_content: string
+          post_id?: string | null
+          scheduled_for: string
+          status?: string
+          topic_title?: string | null
+          updated_at?: string
+          user_id: string
+          zapier_webhook_url: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          post_content?: string
+          post_id?: string | null
+          scheduled_for?: string
+          status?: string
+          topic_title?: string | null
+          updated_at?: string
+          user_id?: string
+          zapier_webhook_url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scheduled_posts_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       topics: {
         Row: {
           category: string
@@ -170,14 +217,56 @@ export type Database = {
         }
         Relationships: []
       }
+      zapier_usage: {
+        Row: {
+          created_at: string
+          id: string
+          limit_count: number
+          month_year: string
+          updated_at: string
+          usage_count: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          limit_count?: number
+          month_year: string
+          updated_at?: string
+          usage_count?: number
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          limit_count?: number
+          month_year?: string
+          updated_at?: string
+          usage_count?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
+      get_zapier_usage: {
+        Args: { p_user_id: string }
+        Returns: {
+          usage_count: number
+          limit_count: number
+          month_year: string
+        }[]
+      }
       increment_topic_usage: {
         Args: { topic_id: string }
         Returns: undefined
+      }
+      increment_zapier_usage: {
+        Args: { p_user_id: string }
+        Returns: boolean
       }
     }
     Enums: {
