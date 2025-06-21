@@ -148,6 +148,7 @@ export type Database = {
           postly_api_key: string | null
           updated_at: string
           user_id: string
+          zapier_webhook_url: string | null
         }
         Insert: {
           created_at?: string
@@ -156,6 +157,7 @@ export type Database = {
           postly_api_key?: string | null
           updated_at?: string
           user_id: string
+          zapier_webhook_url?: string | null
         }
         Update: {
           created_at?: string
@@ -164,6 +166,7 @@ export type Database = {
           postly_api_key?: string | null
           updated_at?: string
           user_id?: string
+          zapier_webhook_url?: string | null
         }
         Relationships: []
       }

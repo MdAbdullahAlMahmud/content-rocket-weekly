@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,16 +13,19 @@ import {
   Archive,
   Loader2,
   RefreshCw,
-  Eye
+  Eye,
+  User
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { usePosts } from "@/hooks/usePosts";
 import { useTopics } from "@/hooks/useTopics";
+import { useSettings } from "@/hooks/useSettings";
 import TopicSelectionModal from "./TopicSelectionModal";
 
 const ContentGenerator = () => {
   const [selectedTopics, setSelectedTopics] = useState<any[]>([]);
   const [customPrompt, setCustomPrompt] = useState("");
+  const [userContext, setUserContext] = useState("");
   const [generatedContent, setGeneratedContent] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [showTopicModal, setShowTopicModal] = useState(false);
@@ -31,6 +35,7 @@ const ContentGenerator = () => {
   const { toast } = useToast();
   const { addPost } = usePosts();
   const { topics } = useTopics();
+  const { settings } = useSettings();
 
   const toneOptions = [
     { value: "professional", label: "Professional" },
@@ -56,77 +61,54 @@ const ContentGenerator = () => {
       return;
     }
 
+    if (!settings?.openai_api_key) {
+      toast({
+        title: "OpenAI API Key Required",
+        description: "Please add your OpenAI API key in Settings to generate content.",
+        variant: "destructive"
+      });
+      return;
+    }
+
     setIsGenerating(true);
     try {
-      // Simulate AI content generation
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
       const topicTitles = selectedTopics.map(t => t.title).join(", ");
-      const prompt = customPrompt || `Create LinkedIn content about: ${topicTitles}`;
+      const topicDescriptions = selectedTopics.map(t => t.description).filter(Boolean).join(" ");
       
-      // Generate content based on tone and size
-      let mockContent = "";
-      
-      if (tone === "professional") {
-        mockContent = `🚀 Professional insights on ${topicTitles}
+      const response = await fetch('/functions/v1/generate-content', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${settings.openai_api_key}`
+        },
+        body: JSON.stringify({
+          topicId: selectedTopics[0]?.id,
+          topicTitle: topicTitles || "General LinkedIn Content",
+          topicDescription: topicDescriptions,
+          customPrompt: customPrompt,
+          userContext: userContext,
+          tone: tone,
+          length: contentSize
+        })
+      });
 
-${customPrompt || `Here's what industry leaders are saying about ${topicTitles} and its impact on business growth...`}
-
-✨ Key takeaways:
-• Strategic implementation drives sustainable results
-• Data-driven approaches ensure measurable outcomes
-• Cross-functional collaboration amplifies success`;
-      } else if (tone === "casual") {
-        mockContent = `Hey LinkedIn! 👋 Let's talk about ${topicTitles}
-
-${customPrompt || `I've been diving deep into ${topicTitles} lately, and wow - the possibilities are endless!`}
-
-Here's what I've discovered:
-• It's simpler than you think to get started
-• The community around this is amazing
-• Small steps lead to big changes`;
-      } else {
-        mockContent = `🚀 Exciting insights on ${topicTitles}!
-
-${customPrompt || `Here's what I've learned about ${topicTitles} and how it can transform your approach...`}
-
-✨ Key takeaways:
-• Innovation drives growth
-• Collaboration amplifies success
-• Continuous learning is essential`;
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to generate content');
       }
 
-      // Adjust content length based on size
-      if (contentSize === "long") {
-        mockContent += `
-
-🎯 Looking ahead:
-The future of ${topicTitles} is bright, and those who adapt early will have a significant competitive advantage.
-
-💡 My recommendation:
-Start small, think big, and don't be afraid to experiment. The best time to begin was yesterday, the second best time is now.`;
-      } else if (contentSize === "short") {
-        // Keep it shorter for short option
-        const lines = mockContent.split('\n');
-        mockContent = lines.slice(0, Math.min(lines.length, 6)).join('\n');
-      }
-
-      mockContent += `
-
-What's your experience with ${topicTitles}? I'd love to hear your thoughts!
-
-#LinkedIn #Professional #Growth #Innovation`;
-
-      setGeneratedContent(mockContent);
+      const data = await response.json();
+      setGeneratedContent(data.content);
       
       toast({
         title: "Content Generated!",
         description: "Your LinkedIn post has been created successfully."
       });
-    } catch (error) {
+    } catch (error: any) {
+      console.error("Generation error:", error);
       toast({
         title: "Generation Failed",
-        description: "Failed to generate content. Please try again.",
+        description: error.message || "Failed to generate content. Please check your API key and try again.",
         variant: "destructive"
       });
     } finally {
@@ -172,6 +154,7 @@ What's your experience with ${topicTitles}? I'd love to hear your thoughts!
       setGeneratedContent("");
       setSelectedTopics([]);
       setCustomPrompt("");
+      setUserContext("");
     } catch (error) {
       toast({
         title: "Save Failed",
@@ -194,6 +177,28 @@ What's your experience with ${topicTitles}? I'd love to hear your thoughts!
           <h2 className="text-2xl font-bold text-slate-900">Content Generator</h2>
           <p className="text-slate-600">Create engaging LinkedIn posts with AI assistance</p>
         </div>
+
+        {/* User Context */}
+        <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg">
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <User className="h-5 w-5 text-blue-500" />
+              Your Context (Optional)
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Textarea
+              placeholder="Tell me about yourself, your industry, role, expertise areas, or any context that helps generate more personalized content..."
+              value={userContext}
+              onChange={(e) => setUserContext(e.target.value)}
+              rows={3}
+              className="resize-none"
+            />
+            <p className="text-xs text-slate-500 mt-2">
+              This helps AI generate content that's more relevant to your professional background
+            </p>
+          </CardContent>
+        </Card>
 
         {/* Topic Selection */}
         <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg">
@@ -286,7 +291,7 @@ What's your experience with ${topicTitles}? I'd love to hear your thoughts!
           </CardHeader>
           <CardContent>
             <Textarea
-              placeholder="Add specific instructions or context for your LinkedIn post..."
+              placeholder="Add specific instructions, angles, or context for your LinkedIn post..."
               value={customPrompt}
               onChange={(e) => setCustomPrompt(e.target.value)}
               rows={3}

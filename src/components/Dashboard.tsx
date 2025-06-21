@@ -125,14 +125,31 @@ const OverviewTab = ({ topics, posts }: { topics: any[], posts: any[] }) => {
     { name: 'Failed', value: posts.filter(p => p.status === 'failed').length, color: '#EF4444' }
   ].filter(item => item.value > 0);
 
-  // Weekly activity data for bar chart
+  // Real weekly activity data based on actual posts
   const getWeeklyData = () => {
-    const weekDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-    return weekDays.map(day => ({
-      day,
-      posts: Math.floor(Math.random() * 5) + 1, // Mock data for now
-      engagement: Math.floor(Math.random() * 100) + 20
-    }));
+    const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const now = new Date();
+    const weekStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay());
+    
+    return weekDays.map((day, index) => {
+      const currentDay = new Date(weekStart);
+      currentDay.setDate(weekStart.getDate() + index);
+      
+      const dayPosts = posts.filter(post => {
+        const postDate = post.scheduled_date ? new Date(post.scheduled_date) : new Date(post.created_at);
+        return postDate.toDateString() === currentDay.toDateString();
+      });
+      
+      const dayEngagement = dayPosts.reduce((acc, post) => 
+        acc + (post.engagement_likes || 0) + (post.engagement_comments || 0) + (post.engagement_shares || 0), 0
+      );
+      
+      return {
+        day,
+        posts: dayPosts.length,
+        engagement: dayEngagement
+      };
+    });
   };
 
   const weeklyData = getWeeklyData();
@@ -198,25 +215,35 @@ const OverviewTab = ({ topics, posts }: { topics: any[], posts: any[] }) => {
             <CardTitle className="text-lg">Post Status Distribution</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={statusData}
-                    cx="50%"
-                    cy="50%"
-                    outerRadius={80}
-                    dataKey="value"
-                    label={({ name, value }) => `${name}: ${value}`}
-                  >
-                    {statusData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
+            {statusData.length > 0 ? (
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={statusData}
+                      cx="50%"
+                      cy="50%"
+                      outerRadius={80}
+                      dataKey="value"
+                      label={({ name, value }) => `${name}: ${value}`}
+                    >
+                      {statusData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            ) : (
+              <div className="h-64 flex items-center justify-center">
+                <div className="text-center">
+                  <Target className="h-12 w-12 text-slate-300 mx-auto mb-4" />
+                  <p className="text-slate-500">No posts yet</p>
+                  <p className="text-sm text-slate-400">Create some content to see the distribution</p>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
 

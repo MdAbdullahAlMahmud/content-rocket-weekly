@@ -15,7 +15,7 @@ serve(async (req) => {
   }
 
   try {
-    const { topicId, topicTitle, topicDescription, tone, length, customPrompt } = await req.json();
+    const { topicId, topicTitle, topicDescription, tone, length, customPrompt, userContext } = await req.json();
     
     // Get user from request
     const authHeader = req.headers.get('Authorization');
@@ -47,18 +47,35 @@ serve(async (req) => {
       throw new Error('OpenAI API key not found. Please add it in Settings.');
     }
 
-    // Prepare the prompt
-    let prompt = `Create a professional LinkedIn post about "${topicTitle}".`;
+    // Build the prompt with proper context
+    let systemPrompt = 'You are a professional LinkedIn content creator. Create engaging, authentic posts that drive engagement and provide value to the audience.';
     
-    if (topicDescription) {
-      prompt += ` Context: ${topicDescription}`;
-    }
-    
-    if (customPrompt) {
-      prompt += ` Additional instructions: ${customPrompt}`;
+    if (userContext) {
+      systemPrompt += ` The user's professional context: ${userContext}`;
     }
 
-    prompt += ` The tone should be ${tone}.`;
+    let userPrompt = '';
+    
+    // If custom prompt is provided, use it as the primary instruction
+    if (customPrompt) {
+      userPrompt = customPrompt;
+      
+      // Add topic context if available
+      if (topicTitle) {
+        userPrompt += ` Focus on the topic: "${topicTitle}".`;
+      }
+      if (topicDescription) {
+        userPrompt += ` Topic context: ${topicDescription}`;
+      }
+    } else {
+      // Use topic-based generation
+      userPrompt = `Create a professional LinkedIn post about "${topicTitle}".`;
+      if (topicDescription) {
+        userPrompt += ` Context: ${topicDescription}`;
+      }
+    }
+
+    userPrompt += ` The tone should be ${tone}.`;
     
     const lengthInstructions = {
       short: "Keep it concise, around 150-200 words.",
@@ -66,10 +83,11 @@ serve(async (req) => {
       long: "Make it comprehensive, around 300-400 words."
     };
     
-    prompt += ` ${lengthInstructions[length as keyof typeof lengthInstructions] || lengthInstructions.medium}`;
-    prompt += " Include relevant emojis and hashtags. Make it engaging and suitable for LinkedIn.";
+    userPrompt += ` ${lengthInstructions[length as keyof typeof lengthInstructions] || lengthInstructions.medium}`;
+    userPrompt += " Include relevant emojis and hashtags. Make it engaging and suitable for LinkedIn.";
 
-    console.log('Generating content with prompt:', prompt);
+    console.log('Generating content with system prompt:', systemPrompt);
+    console.log('User prompt:', userPrompt);
 
     // Call OpenAI API
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -81,11 +99,8 @@ serve(async (req) => {
       body: JSON.stringify({
         model: 'gpt-4o-mini',
         messages: [
-          { 
-            role: 'system', 
-            content: 'You are a professional LinkedIn content creator. Create engaging, authentic posts that drive engagement and provide value to the audience.' 
-          },
-          { role: 'user', content: prompt }
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt }
         ],
         temperature: 0.7,
         max_tokens: 800,
