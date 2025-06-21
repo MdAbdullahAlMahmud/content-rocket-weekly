@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,6 +19,7 @@ import { useToast } from "@/hooks/use-toast";
 import { usePosts } from "@/hooks/usePosts";
 import { useTopics } from "@/hooks/useTopics";
 import { useSettings } from "@/hooks/useSettings";
+import { supabase } from "@/integrations/supabase/client";
 import TopicSelectionModal from "./TopicSelectionModal";
 
 const ContentGenerator = () => {
@@ -75,13 +75,8 @@ const ContentGenerator = () => {
       const topicTitles = selectedTopics.map(t => t.title).join(", ");
       const topicDescriptions = selectedTopics.map(t => t.description).filter(Boolean).join(" ");
       
-      const response = await fetch('/functions/v1/generate-content', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${settings.openai_api_key}`
-        },
-        body: JSON.stringify({
+      const { data, error } = await supabase.functions.invoke('generate-content', {
+        body: {
           topicId: selectedTopics[0]?.id,
           topicTitle: topicTitles || "General LinkedIn Content",
           topicDescription: topicDescriptions,
@@ -89,15 +84,17 @@ const ContentGenerator = () => {
           userContext: userContext,
           tone: tone,
           length: contentSize
-        })
+        }
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to generate content');
+      if (error) {
+        throw new Error(error.message || 'Failed to generate content');
       }
 
-      const data = await response.json();
+      if (!data || !data.content) {
+        throw new Error('No content received from the generation service');
+      }
+
       setGeneratedContent(data.content);
       
       toast({

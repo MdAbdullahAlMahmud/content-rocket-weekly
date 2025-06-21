@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -23,6 +22,7 @@ import { useToast } from "@/hooks/use-toast";
 import { usePosts } from "@/hooks/usePosts";
 import { useSettings } from "@/hooks/useSettings";
 import { useZapierUsage } from "@/hooks/useZapierUsage";
+import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 
 interface ZapierPublisherProps {
@@ -45,6 +45,7 @@ const ZapierPublisher = ({ isOpen, onClose, content, topicTitle, postId }: Zapie
   const { updatePost } = usePosts();
   const { settings } = useSettings();
   const { usage, canUseZapier, getRemainingUsage, incrementUsage } = useZapierUsage();
+  const { user } = useAuth();
 
   const handlePublish = async () => {
     if (!settings?.zapier_webhook_url) {
@@ -83,6 +84,15 @@ const ZapierPublisher = ({ isOpen, onClose, content, topicTitle, postId }: Zapie
       return;
     }
 
+    if (!user) {
+      toast({
+        title: "Authentication Required",
+        description: "Please log in to continue.",
+        variant: "destructive"
+      });
+      return;
+    }
+
     setIsPublishing(true);
     console.log("Publishing to Zapier:", settings.zapier_webhook_url);
 
@@ -94,6 +104,7 @@ const ZapierPublisher = ({ isOpen, onClose, content, topicTitle, postId }: Zapie
         const { error: scheduleError } = await supabase
           .from('scheduled_posts')
           .insert({
+            user_id: user.id,
             post_id: postId,
             scheduled_for: scheduledDateTime.toISOString(),
             zapier_webhook_url: settings.zapier_webhook_url,
@@ -182,7 +193,6 @@ const ZapierPublisher = ({ isOpen, onClose, content, topicTitle, postId }: Zapie
     }
   };
 
-  // Set default date/time to current + 1 hour
   const getDefaultDateTime = () => {
     const now = new Date();
     now.setHours(now.getHours() + 1);
@@ -191,7 +201,6 @@ const ZapierPublisher = ({ isOpen, onClose, content, topicTitle, postId }: Zapie
     return { date, time };
   };
 
-  // Initialize default values when switching to scheduled
   const handleScheduleToggle = (checked: boolean) => {
     setIsScheduled(checked);
     if (checked && !scheduledDate && !scheduledTime) {
